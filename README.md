@@ -109,11 +109,3 @@ node bin/index.js analyze ./test-project
 ## License
 
 MIT — see [LICENSE](LICENSE).
-
-### Disclaimer
-
-This tool is provided **as is**, without warranty of any kind. It only **reads** your source files and prints a report; it does not modify your project.
-
-- Analysis results are heuristic suggestions, not guaranteed refactorings.
-- The authors are not liable for any damages arising from the use of this software.
-- Use at your own risk. Review suggestions before applying changes to your codebase.
