@@ -7,9 +7,14 @@ import {
 } from '../analyzer/patternFinder.js';
 import { normalizeClasses } from '../analyzer/combiner.js';
 import { parseFile } from '../parser/jsxParser.js';
-import type { AnalysisReport } from '../parser/types.js';
+import type {
+  AnalysisReport,
+  AnalyzeOptions,
+  ClassNameOccurrence,
+} from '../parser/types.js';
 import { walkSourceFiles } from '../scanner/fileWalker.js';
 import { printConsoleReport } from '../reporters/consoleReporter.js';
+import { printJsonReport } from '../reporters/jsonReporter.js';
 
 async function pathExists(targetPath: string): Promise<boolean> {
   try {
@@ -23,7 +28,10 @@ async function pathExists(targetPath: string): Promise<boolean> {
 /**
  * Run the full analyze pipeline: scan → parse → find patterns → report.
  */
-export async function analyzeCommand(targetPath: string): Promise<void> {
+export async function analyzeCommand(
+  targetPath: string,
+  options: AnalyzeOptions = {},
+): Promise<AnalysisReport> {
   const resolvedPath = path.resolve(targetPath);
 
   if (!(await pathExists(resolvedPath))) {
@@ -42,9 +50,8 @@ export async function analyzeCommand(targetPath: string): Promise<void> {
     process.exit(1);
   }
 
-  const classSets: string[][] = [];
+  const occurrences: ClassNameOccurrence[] = [];
   const allWarnings: string[] = [];
-  let componentsWithClassName = 0;
 
   for (const file of files) {
     const result = await parseFile(file);
@@ -52,23 +59,37 @@ export async function analyzeCommand(targetPath: string): Promise<void> {
 
     for (const extraction of result.extractions) {
       if (extraction.classes.length > 0) {
-        componentsWithClassName += 1;
-        classSets.push(extraction.classes);
+        occurrences.push({
+          classes: extraction.classes,
+          filePath: file,
+          line: extraction.line,
+        });
       }
     }
   }
 
-  for (const warning of allWarnings) {
-    console.warn(chalk.yellow(`⚠ ${warning}`));
+  if (options.format !== 'json') {
+    for (const warning of allWarnings) {
+      console.warn(chalk.yellow(`⚠ ${warning}`));
+    }
   }
 
   const uniqueCombinationKeys = new Set(
-    classSets.map((set) => normalizeClasses([...new Set(set)])),
+    occurrences.map((occurrence) =>
+      normalizeClasses([...new Set(occurrence.classes)]),
+    ),
   );
 
-  const topCombinations = findFrequentPatterns(classSets);
+  const topCombinations = findFrequentPatterns(occurrences, {
+    minOccurrences: options.minOccurrences,
+    minSize: options.minSize,
+    maxSize: options.maxSize,
+    topLimit: options.top,
+    dedupeSubsets: options.dedupeSubsets,
+  });
+
   const potentialReductionPercent = calculatePotentialReduction(
-    classSets,
+    occurrences,
     topCombinations,
   );
 
@@ -76,14 +97,23 @@ export async function analyzeCommand(targetPath: string): Promise<void> {
     targetPath: resolvedPath,
     stats: {
       filesScanned: files.length,
-      componentsWithClassName,
+      componentsWithClassName: occurrences.length,
       uniqueCombinations: uniqueCombinationKeys.size,
-      totalClassUsages: classSets.reduce((sum, set) => sum + set.length, 0),
+      totalClassUsages: occurrences.reduce(
+        (sum, occurrence) => sum + occurrence.classes.length,
+        0,
+      ),
       topCombinations,
       potentialReductionPercent,
     },
     parseWarnings: allWarnings,
   };
 
-  printConsoleReport(report);
+  if (options.format === 'json') {
+    printJsonReport(report);
+  } else {
+    printConsoleReport(report, { topLimit: options.top });
+  }
+
+  return report;
 }

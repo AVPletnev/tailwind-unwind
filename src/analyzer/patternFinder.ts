@@ -1,10 +1,15 @@
-import type { ClassCombination } from '../parser/types.js';
+import type {
+  ClassCombination,
+  ClassNameOccurrence,
+  CombinationLocation,
+} from '../parser/types.js';
+import { dedupeSubsetCombinations } from './dedupe.js';
 import { generateCombinations, normalizeClasses } from './combiner.js';
 
-const MIN_COMBINATION_SIZE = 2;
-const MAX_COMBINATION_SIZE = 5;
-const MIN_OCCURRENCES = 5;
-const TOP_LIMIT = 10;
+const DEFAULT_MIN_COMBINATION_SIZE = 2;
+const DEFAULT_MAX_COMBINATION_SIZE = 5;
+const DEFAULT_MIN_OCCURRENCES = 5;
+const DEFAULT_TOP_LIMIT = 10;
 
 /** Heuristic: turn a class combo into a suggested CSS class name. */
 function suggestClassName(classes: string[]): string {
@@ -22,34 +27,55 @@ function suggestClassName(classes: string[]): string {
   return `.${base}`;
 }
 
-interface PatternFinderOptions {
+export interface PatternFinderOptions {
   minOccurrences?: number;
+  minSize?: number;
+  maxSize?: number;
   topLimit?: number;
+  dedupeSubsets?: boolean;
+}
+
+interface FrequencyEntry {
+  classes: string[];
+  count: number;
+  locations: CombinationLocation[];
+}
+
+function locationKey(location: CombinationLocation): string {
+  return `${location.filePath}:${location.line ?? 0}`;
 }
 
 /**
- * From every className occurrence, enumerate 2–5 class subsets,
+ * From every className occurrence, enumerate class subsets,
  * count normalized combinations, and return the most frequent ones.
  */
 export function findFrequentPatterns(
-  classSets: string[][],
+  occurrences: ClassNameOccurrence[],
   options: PatternFinderOptions = {},
 ): ClassCombination[] {
-  const minOccurrences = options.minOccurrences ?? MIN_OCCURRENCES;
-  const topLimit = options.topLimit ?? TOP_LIMIT;
+  const minOccurrences = options.minOccurrences ?? DEFAULT_MIN_OCCURRENCES;
+  const minSize = options.minSize ?? DEFAULT_MIN_COMBINATION_SIZE;
+  const maxSize = options.maxSize ?? DEFAULT_MAX_COMBINATION_SIZE;
+  const topLimit = options.topLimit ?? DEFAULT_TOP_LIMIT;
+  const dedupeSubsets = options.dedupeSubsets ?? true;
 
-  const frequency = new Map<string, { classes: string[]; count: number }>();
+  const frequency = new Map<string, FrequencyEntry>();
 
-  for (const classSet of classSets) {
-    const uniqueInElement = [...new Set(classSet)];
+  for (const occurrence of occurrences) {
+    const uniqueInElement = [...new Set(occurrence.classes)];
 
-    if (uniqueInElement.length < MIN_COMBINATION_SIZE) {
+    if (uniqueInElement.length < minSize) {
       continue;
     }
 
-    const maxSize = Math.min(MAX_COMBINATION_SIZE, uniqueInElement.length);
+    const location: CombinationLocation = {
+      filePath: occurrence.filePath,
+      line: occurrence.line,
+    };
 
-    for (let size = MIN_COMBINATION_SIZE; size <= maxSize; size += 1) {
+    const cappedMaxSize = Math.min(maxSize, uniqueInElement.length);
+
+    for (let size = minSize; size <= cappedMaxSize; size += 1) {
       const combos = generateCombinations(uniqueInElement, size);
 
       for (const combo of combos) {
@@ -58,28 +84,42 @@ export function findFrequentPatterns(
 
         if (existing) {
           existing.count += 1;
+          const key = locationKey(location);
+          if (!existing.locations.some((loc) => locationKey(loc) === key)) {
+            existing.locations.push(location);
+          }
         } else {
           frequency.set(normalized, {
             classes: [...combo].sort(),
             count: 1,
+            locations: [location],
           });
         }
       }
     }
   }
 
-  const frequent = [...frequency.entries()]
+  let frequent = [...frequency.entries()]
     .filter(([, value]) => value.count > minOccurrences)
     .map(([normalized, value]) => ({
       normalized,
       classes: value.classes,
       occurrences: value.count,
       suggestion: suggestClassName(value.classes),
+      locations: value.locations,
     }))
-    .sort((a, b) => b.occurrences - a.occurrences)
-    .slice(0, topLimit);
+    .sort((a, b) => {
+      if (b.occurrences !== a.occurrences) {
+        return b.occurrences - a.occurrences;
+      }
+      return b.classes.length - a.classes.length;
+    });
 
-  return frequent;
+  if (dedupeSubsets) {
+    frequent = dedupeSubsetCombinations(frequent);
+  }
+
+  return frequent.slice(0, topLimit);
 }
 
 /**
@@ -87,10 +127,13 @@ export function findFrequentPatterns(
  * Uses the best full combination: each redundant instance could replace N utilities with 1.
  */
 export function calculatePotentialReduction(
-  classSets: string[][],
+  occurrences: ClassNameOccurrence[],
   topCombinations: ClassCombination[],
 ): number {
-  const totalClassUsages = classSets.reduce((sum, set) => sum + set.length, 0);
+  const totalClassUsages = occurrences.reduce(
+    (sum, occurrence) => sum + occurrence.classes.length,
+    0,
+  );
 
   if (totalClassUsages === 0 || topCombinations.length === 0) {
     return 0;

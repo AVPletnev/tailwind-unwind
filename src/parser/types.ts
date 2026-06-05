@@ -4,6 +4,17 @@ export interface ClassNameExtraction {
   line?: number;
 }
 
+export interface ClassNameOccurrence {
+  classes: string[];
+  filePath: string;
+  line?: number;
+}
+
+export interface CombinationLocation {
+  filePath: string;
+  line?: number;
+}
+
 export interface ParseResult {
   filePath: string;
   extractions: ClassNameExtraction[];
@@ -15,6 +26,7 @@ export interface ClassCombination {
   classes: string[];
   occurrences: number;
   suggestion: string;
+  locations: CombinationLocation[];
 }
 
 export interface AnalysisStats {
@@ -30,4 +42,13 @@ export interface AnalysisReport {
   targetPath: string;
   stats: AnalysisStats;
   parseWarnings: string[];
+}
+
+export interface AnalyzeOptions {
+  minOccurrences?: number;
+  minSize?: number;
+  maxSize?: number;
+  top?: number;
+  format?: 'console' | 'json';
+  dedupeSubsets?: boolean;
 }

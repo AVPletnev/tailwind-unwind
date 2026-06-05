@@ -6,11 +6,33 @@ function formatNumber(value: number): string {
   return value.toLocaleString('en-US');
 }
 
+function formatLocations(
+  locations: AnalysisReport['stats']['topCombinations'][number]['locations'],
+): string {
+  const preview = locations.slice(0, 3).map((loc) => {
+    const line = loc.line ? `:${loc.line}` : '';
+    return `${loc.filePath}${line}`;
+  });
+
+  const suffix =
+    locations.length > 3 ? ` (+${locations.length - 3} more)` : '';
+
+  return preview.join(', ') + suffix;
+}
+
+interface ConsoleReportOptions {
+  topLimit?: number;
+}
+
 /**
  * Render the analysis report to stdout with colors and the layout from the spec.
  */
-export function printConsoleReport(report: AnalysisReport): void {
+export function printConsoleReport(
+  report: AnalysisReport,
+  options: ConsoleReportOptions = {},
+): void {
   const { stats } = report;
+  const topLimit = options.topLimit ?? 10;
 
   console.log('');
   console.log(chalk.bold.cyan('📊 Tailwind Analysis Report'));
@@ -27,11 +49,13 @@ export function printConsoleReport(report: AnalysisReport): void {
   if (stats.topCombinations.length === 0) {
     console.log(
       chalk.yellow(
-        'No frequent class combinations found (need > 5 occurrences, 2–5 classes each).',
+        'No frequent class combinations found matching the current filters.',
       ),
     );
   } else {
-    console.log(chalk.bold.green('🏆 Top 10 most frequent combinations:'));
+    console.log(
+      chalk.bold.green(`🏆 Top ${Math.min(topLimit, stats.topCombinations.length)} most frequent combinations:`),
+    );
     console.log('');
 
     stats.topCombinations.forEach((combo, index) => {
@@ -45,6 +69,9 @@ export function printConsoleReport(report: AnalysisReport): void {
       );
       console.log(
         chalk.gray(`   Suggestion: `) + chalk.green(combo.suggestion),
+      );
+      console.log(
+        chalk.gray(`   Found in: `) + chalk.dim(formatLocations(combo.locations)),
       );
       console.log('');
     });

@@ -2,6 +2,8 @@
 
 Analyze Tailwind CSS class usage patterns in React and Next.js projects. Find repeated utility combinations and opportunities to extract reusable component classes.
 
+**Repository:** [github.com/AVPletnev/tailwind-unwind](https://github.com/AVPletnev/tailwind-unwind)
+
 ## Installation
 
 ```bash
@@ -14,6 +16,25 @@ npx tailwind-unwind analyze ./src
 
 ```bash
 npx tailwind-unwind analyze <path>
+```
+
+### CLI options
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--min-occurrences <n>` | `5` | Minimum occurrences for a combination |
+| `--min-size <n>` | `2` | Minimum classes per combination |
+| `--max-size <n>` | `5` | Maximum classes per combination |
+| `--top <n>` | `10` | Number of top combinations to show |
+| `--format <type>` | `console` | Output format: `console` or `json` |
+| `--no-dedupe-subsets` | — | Include subset combinations in results |
+
+```bash
+# JSON report for CI
+npx tailwind-unwind analyze ./src --format json
+
+# Stricter filters
+npx tailwind-unwind analyze ./src --min-occurrences 10 --top 5
 ```
 
 Scan a directory recursively for `.tsx`, `.jsx`, `.ts`, and `.js` files. The tool ignores `node_modules`, `.next`, `dist`, `build`, and `.git`.
@@ -43,13 +64,14 @@ Unique class combinations: 4
 
 ## What it analyzes
 
-- **Static strings:** `className="flex p-4"`
-- **Template literals:** `className={\`flex p-4 ${active ? 'bg-blue' : ''}\`}` — static segments are extracted; dynamic expressions are noted with a warning
-- **Dynamic expressions:** `className={cn('flex', isActive && 'p-4')}` — skipped with a warning (MVP)
+- **Static strings:** `className="flex p-4"` and `class="flex p-4"`
+- **Template literals:** `className={\`flex p-4 ${active ? 'bg-blue' : ''}\`}` — static segments extracted
+- **Class merge utilities:** `cn()`, `clsx()`, `classnames()`, `twMerge()`, `cx()` — string arguments and conditionals extracted
+- **Fully dynamic expressions:** `className={getClasses()}` — skipped with a warning
 
 Class combinations are normalized (order-independent): `flex p-4` and `p-4 flex` count as the same pattern.
 
-The analyzer reports combinations of **2–5 classes** that appear more than **5 times**.
+Subset combinations are deduplicated by default (e.g. `flex p-4` is hidden when `flex items-center p-4` is present). Each result includes file locations.
 
 ## Programmatic API
 
@@ -64,7 +86,15 @@ import {
 
 const files = await walkSourceFiles('./src');
 const result = await parseFile(files[0]);
-const patterns = findFrequentPatterns([result.extractions[0].classes]);
+const extraction = result.extractions[0];
+
+const patterns = findFrequentPatterns([
+  {
+    classes: extraction.classes,
+    filePath: files[0],
+    line: extraction.line,
+  },
+]);
 ```
 
 ## Development
@@ -72,9 +102,18 @@ const patterns = findFrequentPatterns([result.extractions[0].classes]);
 ```bash
 npm install
 npm run build
+npm test
 node bin/index.js analyze ./test-project
 ```
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).
+
+### Disclaimer
+
+This tool is provided **as is**, without warranty of any kind. It only **reads** your source files and prints a report; it does not modify your project.
+
+- Analysis results are heuristic suggestions, not guaranteed refactorings.
+- The authors are not liable for any damages arising from the use of this software.
+- Use at your own risk. Review suggestions before applying changes to your codebase.

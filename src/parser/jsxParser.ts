@@ -1,28 +1,30 @@
 import { parse } from '@babel/parser';
 import babelTraverse from '@babel/traverse';
 import type { NodePath } from '@babel/traverse';
-import type {
-  Expression,
-  JSXAttribute,
-  JSXElement,
-  Node,
-  TemplateLiteral,
-} from '@babel/types';
+import type { JSXAttribute, JSXElement, Node } from '@babel/types';
+import fs from 'node:fs/promises';
+import type { ClassNameExtraction, ParseResult } from './types.js';
+import { extractClassesFromExpression } from './classHelpers.js';
 
 type TraverseFn = (
   ast: Node,
   visitors: { JSXElement?: (path: NodePath<JSXElement>) => void },
 ) => void;
 
-interface BabelTraverseModule {
-  default: TraverseFn;
+function resolveTraverse(module: unknown): TraverseFn {
+  if (typeof module === 'function') {
+    return module as TraverseFn;
+  }
+
+  const withDefault = module as { default?: unknown };
+  if (typeof withDefault.default === 'function') {
+    return withDefault.default as TraverseFn;
+  }
+
+  throw new Error('Failed to load @babel/traverse');
 }
 
-// @babel/traverse is CJS; Node ESM exposes the callable on `.default`.
-const traverse = (babelTraverse as unknown as BabelTraverseModule).default;
-import fs from 'node:fs/promises';
-import type { ClassNameExtraction, ParseResult } from './types.js';
-import { splitClassString } from '../analyzer/combiner.js';
+const traverse = resolveTraverse(babelTraverse);
 
 const PARSER_PLUGINS = [
   'jsx',
@@ -35,33 +37,7 @@ const PARSER_PLUGINS = [
   'importMeta',
 ] as const;
 
-function extractFromStringLiteral(value: string): string[] {
-  return splitClassString(value);
-}
-
-/**
- * Pull static string segments from template literals.
- * Dynamic expressions (`${...}`) are skipped — flagged as partially dynamic.
- */
-function extractFromTemplateLiteral(node: TemplateLiteral): {
-  classes: string[];
-  hasExpressions: boolean;
-} {
-  const parts: string[] = [];
-  let hasExpressions = node.expressions.length > 0;
-
-  for (const quasi of node.quasis) {
-    if (quasi.value.cooked) {
-      parts.push(quasi.value.cooked);
-    }
-  }
-
-  const combined = parts.join(' ').trim();
-  return {
-    classes: combined ? splitClassString(combined) : [],
-    hasExpressions,
-  };
-}
+const CLASS_ATTRIBUTES = new Set(['className', 'class']);
 
 function getAttributeName(attr: JSXAttribute): string | null {
   if (attr.name.type === 'JSXIdentifier') {
@@ -70,46 +46,28 @@ function getAttributeName(attr: JSXAttribute): string | null {
   return null;
 }
 
-function extractClassesFromExpression(
-  expression: Expression,
-): { classes: string[]; isDynamic: boolean } | null {
-  if (expression.type === 'StringLiteral') {
-    return {
-      classes: extractFromStringLiteral(expression.value),
-      isDynamic: false,
-    };
-  }
-
-  if (expression.type === 'TemplateLiteral') {
-    const { classes, hasExpressions } = extractFromTemplateLiteral(expression);
-    return { classes, isDynamic: hasExpressions };
-  }
-
-  // Conditional / call expressions like cn(), clsx() — dynamic for MVP
-  return { classes: [], isDynamic: true };
+function isClassAttribute(attr: JSXAttribute): boolean {
+  const name = getAttributeName(attr);
+  return name !== null && CLASS_ATTRIBUTES.has(name);
 }
 
 function extractFromJSXAttribute(
   attr: JSXAttribute,
 ): ClassNameExtraction | null {
-  const name = getAttributeName(attr);
-  if (name !== 'className') {
+  if (!isClassAttribute(attr)) {
     return null;
   }
 
   const line = attr.loc?.start.line;
-
   const value = attr.value;
+
   if (value == null) {
     return { classes: [], isDynamic: true, line };
   }
 
   if (value.type === 'StringLiteral') {
-    return {
-      classes: extractFromStringLiteral(value.value),
-      isDynamic: false,
-      line,
-    };
+    const result = extractClassesFromExpression(value);
+    return { classes: result.classes, isDynamic: result.isDynamic, line };
   }
 
   if (value.type === 'JSXExpressionContainer') {
@@ -120,52 +78,29 @@ function extractFromJSXAttribute(
     }
 
     const result = extractClassesFromExpression(expr);
-    if (!result) {
-      return { classes: [], isDynamic: true, line };
-    }
-
     return { classes: result.classes, isDynamic: result.isDynamic, line };
   }
 
   return { classes: [], isDynamic: true, line };
 }
 
-function isJSXElementWithClassName(path: NodePath<JSXElement>): boolean {
+function isJSXElementWithClassAttribute(path: NodePath<JSXElement>): boolean {
   const opening = path.node.openingElement;
-  return opening.attributes.some((attr) => {
-    if (attr.type !== 'JSXAttribute') return false;
-    return getAttributeName(attr) === 'className';
-  });
+  return opening.attributes.some(
+    (attr) => attr.type === 'JSXAttribute' && isClassAttribute(attr),
+  );
 }
 
-/**
- * Parse a single source file and collect all className values from JSX elements.
- */
-export async function parseFile(filePath: string): Promise<ParseResult> {
-  const source = await fs.readFile(filePath, 'utf-8');
+function collectExtractionsFromAst(
+  ast: Node,
+  filePath: string,
+): { extractions: ClassNameExtraction[]; warnings: string[] } {
   const extractions: ClassNameExtraction[] = [];
   const warnings: string[] = [];
 
-  let ast;
-
-  try {
-    ast = parse(source, {
-      sourceType: 'module',
-      plugins: [...PARSER_PLUGINS],
-      errorRecovery: true,
-      allowReturnOutsideFunction: true,
-      ranges: false,
-      tokens: false,
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    warnings.push(`Failed to parse ${filePath}: ${message}`);
-    return { filePath, extractions, warnings };
-  }
-
   traverse(ast, {
     JSXElement(path: NodePath<JSXElement>) {
-      if (!isJSXElementWithClassName(path)) {
+      if (!isJSXElementWithClassAttribute(path)) {
         return;
       }
 
@@ -192,5 +127,44 @@ export async function parseFile(filePath: string): Promise<ParseResult> {
     },
   });
 
+  return { extractions, warnings };
+}
+
+/**
+ * Parse in-memory source (used by tests and parseFile).
+ */
+export function parseSource(
+  source: string,
+  filePath = 'unknown',
+): ParseResult {
+  const extractions: ClassNameExtraction[] = [];
+  const warnings: string[] = [];
+
+  try {
+    const ast = parse(source, {
+      sourceType: 'module',
+      plugins: [...PARSER_PLUGINS],
+      errorRecovery: true,
+      allowReturnOutsideFunction: true,
+      ranges: false,
+      tokens: false,
+    });
+
+    const collected = collectExtractionsFromAst(ast, filePath);
+    extractions.push(...collected.extractions);
+    warnings.push(...collected.warnings);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    warnings.push(`Failed to parse ${filePath}: ${message}`);
+  }
+
   return { filePath, extractions, warnings };
+}
+
+/**
+ * Parse a single source file and collect all className/class values from JSX.
+ */
+export async function parseFile(filePath: string): Promise<ParseResult> {
+  const source = await fs.readFile(filePath, 'utf-8');
+  return parseSource(source, filePath);
 }

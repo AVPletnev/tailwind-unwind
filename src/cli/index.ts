@@ -14,9 +14,24 @@ program
   .command('analyze')
   .description('Scan a directory and report frequent Tailwind class combinations')
   .argument('<path>', 'Directory to analyze')
-  .action(async (targetPath: string) => {
+  .option('--min-occurrences <n>', 'Minimum occurrences threshold', '5')
+  .option('--min-size <n>', 'Minimum classes per combination', '2')
+  .option('--max-size <n>', 'Maximum classes per combination', '5')
+  .option('--top <n>', 'Number of top combinations to show', '10')
+  .option('--format <type>', 'Output format: console or json', 'console')
+  .option('--no-dedupe-subsets', 'Include subset combinations in results')
+  .action(async (targetPath: string, opts) => {
     try {
-      await analyzeCommand(targetPath);
+      const format = opts.format === 'json' ? 'json' : 'console';
+
+      await analyzeCommand(targetPath, {
+        minOccurrences: Number(opts.minOccurrences),
+        minSize: Number(opts.minSize),
+        maxSize: Number(opts.maxSize),
+        top: Number(opts.top),
+        format,
+        dedupeSubsets: opts.dedupeSubsets,
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error('Unexpected error:', message);
