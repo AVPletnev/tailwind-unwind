@@ -10,6 +10,7 @@ import type { PatternFinderOptions } from '../analyzer/patternFinder.js';
 export interface BuildComponentsOptions extends PatternFinderOptions {
   sourcePath: string;
   prefix?: string;
+  names?: Record<string, string>;
 }
 
 export interface BuildComponentsResult {
@@ -34,6 +35,7 @@ export function buildComponents(
     sourcePath: options.sourcePath,
     combinations,
     prefix: options.prefix,
+    names: options.names,
   });
 
   const replacementMap = new Map<string, string>();

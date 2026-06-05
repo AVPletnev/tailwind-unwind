@@ -25,7 +25,11 @@ export async function generateCommand(
   let scanResult;
 
   try {
-    scanResult = await scanProject({ targetPath });
+    scanResult = await scanProject({
+      targetPath,
+      include: options.include,
+      exclude: options.exclude,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(chalk.red(`Error: ${message}`));
@@ -43,6 +47,7 @@ export async function generateCommand(
     maxSize: options.maxSize,
     topLimit: options.top,
     prefix: options.prefix,
+    names: options.names,
   });
 
   const outputPath = path.resolve(options.output);

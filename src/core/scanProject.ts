@@ -3,6 +3,7 @@ import path from 'node:path';
 import {
   calculatePotentialReduction,
   findFrequentPatterns,
+  findRepeatedClassSets,
   type PatternFinderOptions,
 } from '../analyzer/patternFinder.js';
 import { normalizeClasses } from '../analyzer/combiner.js';
@@ -24,6 +25,10 @@ async function pathExists(targetPath: string): Promise<boolean> {
 
 export interface ScanProjectOptions extends PatternFinderOptions {
   targetPath: string;
+  include?: string[];
+  exclude?: string[];
+  /** Threshold used to mark combinations as extractable by generate/apply */
+  extractableMinOccurrences?: number;
 }
 
 export interface ScanProjectResult {
@@ -46,7 +51,10 @@ export async function scanProject(
     throw new Error(`Path does not exist: ${resolvedPath}`);
   }
 
-  const files = await walkSourceFiles(resolvedPath);
+  const files = await walkSourceFiles(resolvedPath, {
+    include: options.include,
+    exclude: options.exclude,
+  });
 
   if (files.length === 0) {
     throw new Error(
@@ -78,13 +86,28 @@ export async function scanProject(
     ),
   );
 
-  const topCombinations = findFrequentPatterns(occurrences, {
+  const frequentCombinations = findFrequentPatterns(occurrences, {
     minOccurrences: options.minOccurrences,
     minSize: options.minSize,
     maxSize: options.maxSize,
     topLimit: options.topLimit,
     dedupeSubsets: options.dedupeSubsets,
   });
+
+  const extractableSets = findRepeatedClassSets(occurrences, {
+    minOccurrences: options.extractableMinOccurrences ?? 3,
+    minSize: options.minSize,
+    maxSize: options.maxSize,
+    topLimit: Number.POSITIVE_INFINITY,
+  });
+  const extractableKeys = new Set(
+    extractableSets.map((combo) => combo.normalized),
+  );
+
+  const topCombinations = frequentCombinations.map((combo) => ({
+    ...combo,
+    extractable: extractableKeys.has(combo.normalized),
+  }));
 
   const potentialReductionPercent = calculatePotentialReduction(
     occurrences,

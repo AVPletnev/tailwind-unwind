@@ -33,6 +33,36 @@ describe('replaceClassNamesInSource', () => {
     expect(result.source).toContain('className="twu-toolbar"');
   });
 
+  it('partially replaces cn() when dynamic args remain', () => {
+    const source = `<div className={cn('flex items-center justify-between p-4', active && 'bg-blue')}>X</div>`;
+    const result = replaceClassNamesInSource(
+      source,
+      replacementMap,
+      'Test.tsx',
+    );
+
+    expect(result.changed).toBe(true);
+    expect(result.replacements[0]?.partial).toBe(true);
+    expect(result.replacements[0]?.to).toBe('twu-toolbar');
+    expect(result.source).toContain('twu-toolbar');
+    expect(result.source).toContain('active');
+    expect(result.source).not.toContain('justify-between p-4');
+  });
+
+  it('collapses multiple static cn() args when dynamic args remain', () => {
+    const source = `<div className={cn('flex', 'items-center', 'justify-between', 'p-4', active && 'bg-blue')}>X</div>`;
+    const result = replaceClassNamesInSource(
+      source,
+      replacementMap,
+      'Test.tsx',
+    );
+
+    expect(result.changed).toBe(true);
+    expect(result.replacements[0]?.partial).toBe(true);
+    expect(result.source).toContain('twu-toolbar');
+    expect(result.source).toContain('active');
+  });
+
   it('skips dynamic className expressions', () => {
     const source = `<div className={getClasses()}>A</div>`;
     const result = replaceClassNamesInSource(

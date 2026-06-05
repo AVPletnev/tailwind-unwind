@@ -27,6 +27,8 @@ export interface ClassCombination {
   occurrences: number;
   suggestion: string;
   locations: CombinationLocation[];
+  /** True when generate/apply can extract this exact class set */
+  extractable?: boolean;
 }
 
 export interface AnalysisStats {
@@ -53,4 +55,9 @@ export interface AnalyzeOptions {
   dedupeSubsets?: boolean;
   /** Namespace prefix for generated component classes (default: twu-) */
   prefix?: string;
+  include?: string[];
+  exclude?: string[];
+  configPath?: string;
+  /** Custom base class names keyed by space-separated utility strings */
+  names?: Record<string, string>;
 }

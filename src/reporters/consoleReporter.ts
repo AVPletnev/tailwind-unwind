@@ -70,6 +70,17 @@ export function printConsoleReport(
       console.log(
         chalk.gray(`   Suggestion: `) + chalk.green(combo.suggestion),
       );
+      if (combo.extractable) {
+        console.log(
+          chalk.gray(`   Extractable: `) +
+            chalk.green('yes — use generate/apply'),
+        );
+      } else {
+        console.log(
+          chalk.gray(`   Extractable: `) +
+            chalk.yellow('subset only — analyze hint'),
+        );
+      }
       console.log(
         chalk.gray(`   Found in: `) + chalk.dim(formatLocations(combo.locations)),
       );
@@ -82,6 +93,16 @@ export function printConsoleReport(
       `💡 Potential code reduction: ${stats.potentialReductionPercent}%`,
     ),
   );
+  const extractableCount = stats.topCombinations.filter(
+    (combo) => combo.extractable,
+  ).length;
+  if (extractableCount > 0) {
+    console.log(
+      chalk.magenta(
+        `💡 ${extractableCount} pattern(s) ready for generate/apply`,
+      ),
+    );
+  }
   console.log(
     chalk.magenta(
       '💡 Generate CSS: npx tailwind-unwind generate <path> --output styles.css',

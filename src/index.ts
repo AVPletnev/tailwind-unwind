@@ -1,3 +1,12 @@
+export { loadCommandOptions } from './config/loadConfig.js';
+export { validateConfigFile, normalizeNamesConfig } from './config/validate.js';
+export type {
+  CliCommand,
+  CommandConfig,
+  CustomNamesConfig,
+  TailwindUnwindConfig,
+  TailwindUnwindConfigFile,
+} from './config/types.js';
 export { analyzeCommand } from './commands/analyze.js';
 export { applyCommand } from './commands/apply.js';
 export { generateCommand } from './commands/generate.js';

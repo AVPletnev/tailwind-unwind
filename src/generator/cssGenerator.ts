@@ -1,4 +1,7 @@
+import { normalizeClasses } from '../analyzer/combiner.js';
 import { suggestClassName } from '../analyzer/suggestions.js';
+import { normalizeNamesConfig } from '../config/validate.js';
+import type { CustomNamesConfig } from '../config/types.js';
 import type { ClassCombination } from '../parser/types.js';
 import { normalizeClassPrefix, withClassPrefix } from './classPrefix.js';
 
@@ -12,6 +15,7 @@ export interface CssGeneratorOptions {
   sourcePath: string;
   combinations: ClassCombination[];
   prefix?: string;
+  names?: CustomNamesConfig;
 }
 
 export interface CssGeneratorResult {
@@ -21,6 +25,15 @@ export interface CssGeneratorResult {
 
 export interface AssignClassNamesOptions {
   prefix?: string;
+  names?: CustomNamesConfig;
+}
+
+function resolveBaseClassName(
+  classes: string[],
+  customNames: Map<string, string>,
+): string {
+  const key = normalizeClasses(classes);
+  return customNames.get(key) ?? suggestClassName(classes);
 }
 
 /** Assign unique, prefixed component class names. */
@@ -29,9 +42,10 @@ export function assignComponentClassNames(
   options: AssignClassNamesOptions = {},
 ): GeneratedComponent[] {
   const used = new Set<string>();
+  const customNames = normalizeNamesConfig(options.names);
 
   return combinations.map((combo) => {
-    const base = suggestClassName(combo.classes);
+    const base = resolveBaseClassName(combo.classes, customNames);
     let className = withClassPrefix(base, options.prefix);
     let suffix = 2;
 
@@ -59,6 +73,7 @@ export function generateComponentCss(
 ): CssGeneratorResult {
   const components = assignComponentClassNames(options.combinations, {
     prefix: options.prefix,
+    names: options.names,
   });
   const timestamp = new Date().toISOString();
   const classPrefix = normalizeClassPrefix(options.prefix);

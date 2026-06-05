@@ -21,6 +21,9 @@ export async function analyzeCommand(
       maxSize: options.maxSize,
       topLimit: options.top,
       dedupeSubsets: options.dedupeSubsets,
+      include: options.include,
+      exclude: options.exclude,
+      extractableMinOccurrences: 3,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

@@ -2,8 +2,18 @@ import babelGenerate from '@babel/generator';
 import babelTraverse from '@babel/traverse';
 import * as t from '@babel/types';
 import type { NodePath } from '@babel/traverse';
-import type { JSXAttribute, JSXElement, Node } from '@babel/types';
+import type {
+  CallExpression,
+  Expression,
+  JSXAttribute,
+  JSXElement,
+  Node,
+} from '@babel/types';
 import { normalizeClasses } from '../analyzer/combiner.js';
+import {
+  CLASS_MERGE_CALLEES,
+  extractClassesFromExpression,
+} from '../parser/classHelpers.js';
 import {
   extractFromJSXAttribute,
   isClassAttribute,
@@ -55,6 +65,7 @@ export interface ClassReplacement {
   line?: number;
   from: string;
   to: string;
+  partial?: boolean;
 }
 
 export interface SkippedReplacement {
@@ -71,6 +82,29 @@ export interface ReplaceClassNamesResult {
   changed: boolean;
 }
 
+function isClassMergeCallee(expression: Expression): boolean {
+  if (expression.type === 'Identifier') {
+    return CLASS_MERGE_CALLEES.has(expression.name);
+  }
+
+  if (
+    expression.type === 'MemberExpression' &&
+    expression.property.type === 'Identifier'
+  ) {
+    return CLASS_MERGE_CALLEES.has(expression.property.name);
+  }
+
+  return false;
+}
+
+function isClassMergeCall(expression: Expression): expression is CallExpression {
+  return (
+    expression.type === 'CallExpression' &&
+    expression.callee.type !== 'V8IntrinsicIdentifier' &&
+    isClassMergeCallee(expression.callee)
+  );
+}
+
 function lookupReplacement(
   extraction: { classes: string[]; isDynamic: boolean },
   replacementMap: Map<string, string>,
@@ -83,15 +117,132 @@ function lookupReplacement(
   return replacementMap.get(key) ?? null;
 }
 
-function setStringClassAttribute(
-  attr: JSXAttribute,
-  className: string,
-): void {
+function setStringClassAttribute(attr: JSXAttribute, className: string): void {
   attr.value = t.stringLiteral(className);
+}
+
+interface MergeCallReplacement {
+  expression: Expression;
+  from: string;
+  to: string;
+  partial: boolean;
+}
+
+/**
+ * Replace static utility groups inside cn()/clsx() while preserving dynamic args.
+ */
+function tryReplaceMergeCall(
+  call: CallExpression,
+  replacementMap: Map<string, string>,
+): MergeCallReplacement | null {
+  const staticClasses: string[] = [];
+  const dynamicArgs: CallExpression['arguments'] = [];
+
+  for (const arg of call.arguments) {
+    if (arg.type === 'SpreadElement' || arg.type === 'ArgumentPlaceholder') {
+      dynamicArgs.push(arg);
+      continue;
+    }
+
+    const extracted = extractClassesFromExpression(arg);
+    if (extracted.isDynamic) {
+      dynamicArgs.push(arg);
+      continue;
+    }
+
+    staticClasses.push(...extracted.classes);
+  }
+
+  const combinedKey = normalizeClasses([...new Set(staticClasses)]);
+  const combinedReplacement = replacementMap.get(combinedKey);
+
+  if (combinedReplacement && staticClasses.length > 0) {
+    if (dynamicArgs.length === 0) {
+      return {
+        expression: t.stringLiteral(combinedReplacement),
+        from: combinedKey,
+        to: combinedReplacement,
+        partial: false,
+      };
+    }
+
+    return {
+      expression: t.callExpression(call.callee, [
+        t.stringLiteral(combinedReplacement),
+        ...dynamicArgs,
+      ]),
+      from: combinedKey,
+      to: combinedReplacement,
+      partial: true,
+    };
+  }
+
+  let replaced = false;
+  let replacedTo = '';
+  let replacedFrom = '';
+  const newArgs = [...call.arguments];
+
+  for (let index = 0; index < call.arguments.length; index += 1) {
+    const arg = call.arguments[index];
+    if (
+      arg === undefined ||
+      arg.type === 'SpreadElement' ||
+      arg.type === 'ArgumentPlaceholder'
+    ) {
+      continue;
+    }
+
+    const extracted = extractClassesFromExpression(arg);
+    if (extracted.isDynamic || extracted.classes.length === 0) {
+      continue;
+    }
+
+    const argKey = normalizeClasses(extracted.classes);
+    const replacement = replacementMap.get(argKey);
+    if (!replacement) {
+      continue;
+    }
+
+    newArgs[index] = t.stringLiteral(replacement);
+    if (!replaced) {
+      replacedFrom = argKey;
+      replacedTo = replacement;
+    }
+    replaced = true;
+  }
+
+  if (!replaced) {
+    return null;
+  }
+
+  return {
+    expression: t.callExpression(call.callee, newArgs),
+    from: replacedFrom,
+    to: replacedTo,
+    partial: true,
+  };
+}
+
+function tryReplaceClassAttribute(
+  attr: JSXAttribute,
+  replacementMap: Map<string, string>,
+): MergeCallReplacement | null {
+  const value = attr.value;
+  if (value?.type !== 'JSXExpressionContainer') {
+    return null;
+  }
+
+  const expression = value.expression;
+  if (expression.type === 'JSXEmptyExpression' || !isClassMergeCall(expression)) {
+    return null;
+  }
+
+  return tryReplaceMergeCall(expression, replacementMap);
 }
 
 /**
  * Replace exact matching className/class values with generated component classes.
+ * Supports partial replacement inside cn()/clsx() when dynamic args are present.
  */
 export function replaceClassNamesInSource(
   source: string,
@@ -125,6 +276,24 @@ export function replaceClassNamesInSource(
 
         const extraction = extractFromJSXAttribute(attr);
         if (!extraction) continue;
+
+        const mergeReplacement = tryReplaceClassAttribute(attr, replacementMap);
+        if (mergeReplacement) {
+          if (mergeReplacement.expression.type === 'StringLiteral') {
+            setStringClassAttribute(attr, mergeReplacement.expression.value);
+          } else {
+            attr.value = t.jsxExpressionContainer(mergeReplacement.expression);
+          }
+
+          replacements.push({
+            filePath,
+            line: extraction.line,
+            from: mergeReplacement.from,
+            to: mergeReplacement.to,
+            partial: mergeReplacement.partial,
+          });
+          continue;
+        }
 
         const replacement = lookupReplacement(extraction, replacementMap);
 

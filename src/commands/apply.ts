@@ -28,7 +28,11 @@ export async function applyCommand(
   let scanResult;
 
   try {
-    scanResult = await scanProject({ targetPath });
+    scanResult = await scanProject({
+      targetPath,
+      include: options.include,
+      exclude: options.exclude,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(chalk.red(`Error: ${message}`));
@@ -48,6 +52,7 @@ export async function applyCommand(
       maxSize: options.maxSize,
       topLimit: options.top,
       prefix: options.prefix,
+      names: options.names,
     },
   );
 
@@ -68,6 +73,13 @@ export async function applyCommand(
     line?: number;
     from: string;
     to: string;
+    partial?: boolean;
+  }> = [];
+  const allSkipped: Array<{
+    filePath: string;
+    line?: number;
+    reason: string;
+    classes: string[];
   }> = [];
 
   for (const file of scanResult.files) {
@@ -80,6 +92,7 @@ export async function applyCommand(
 
     replacementsTotal += result.replacements.length;
     allReplacements.push(...result.replacements);
+    allSkipped.push(...result.skipped);
 
     if (result.changed) {
       filesModified += 1;
@@ -117,11 +130,29 @@ export async function applyCommand(
     console.log(chalk.bold('Replacements:'));
     for (const item of allReplacements) {
       const line = item.line ? `:${item.line}` : '';
+      const partialTag = item.partial ? chalk.dim(' (partial)') : '';
       console.log(
         chalk.gray(`  ${item.filePath}${line}`) +
           chalk.white(` "${item.from}" `) +
           chalk.cyan('→') +
-          chalk.green(` "${item.to}"`),
+          chalk.green(` "${item.to}"`) +
+          partialTag,
+      );
+    }
+  }
+
+  if (allSkipped.length > 0) {
+    console.log('');
+    console.log(
+      chalk.bold.yellow(`Skipped (${allSkipped.length}):`),
+    );
+    for (const item of allSkipped) {
+      const line = item.line ? `:${item.line}` : '';
+      const classes = item.classes.join(' ');
+      console.log(
+        chalk.gray(`  ${item.filePath}${line}`) +
+          chalk.yellow(` [${item.reason}]`) +
+          chalk.dim(` "${classes}"`),
       );
     }
   }

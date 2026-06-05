@@ -58,6 +58,20 @@ describe('cssGenerator', () => {
     expect(components[0]?.className).toMatch(/^app-/);
   });
 
+  it('uses custom names from config', () => {
+    const { components } = generateComponentCss({
+      sourcePath: './src',
+      combinations: [
+        combo(['flex', 'items-center', 'justify-between', 'p-4'], 8),
+      ],
+      names: {
+        'flex items-center justify-between p-4': 'app-header',
+      },
+    });
+
+    expect(components[0]?.className).toBe('twu-app-header');
+  });
+
   it('returns helpful comment when no combinations found', () => {
     const { css, components } = generateComponentCss({
       sourcePath: './src',

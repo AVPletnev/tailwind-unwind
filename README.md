@@ -1,5 +1,7 @@
 # tailwind-unwind
 
+[![npm version](https://img.shields.io/npm/v/tailwind-unwind.svg)](https://www.npmjs.com/package/tailwind-unwind)
+
 CLI tool to analyze, extract, and refactor repeated Tailwind CSS utility patterns in React and Next.js projects.
 
 **Repository:** [github.com/AVPletnev/tailwind-unwind](https://github.com/AVPletnev/tailwind-unwind)
@@ -22,6 +24,52 @@ npx tailwind-unwind analyze ./src
 ```
 
 Requires **Node.js 18+**.
+
+## Configuration
+
+Copy [`tailwind-unwind.config.example.json`](tailwind-unwind.config.example.json) to your project root:
+
+```bash
+cp node_modules/tailwind-unwind/tailwind-unwind.config.example.json tailwind-unwind.config.json
+```
+
+Supported filenames: `tailwind-unwind.config.json`, `.tailwind-unwindrc`, `tailwind-unwind.config.js` / `.mjs` / `.cjs`.
+
+```json
+{
+  "include": ["src/**/*.tsx"],
+  "exclude": ["**/*.test.tsx", "**/*.stories.tsx"],
+  "names": {
+    "flex items-center justify-between p-4": "page-header",
+    "w-full h-auto object-cover rounded-lg": "media-cover"
+  },
+  "analyze": {
+    "minOccurrences": 5,
+    "top": 10
+  },
+  "generate": {
+    "minOccurrences": 3,
+    "prefix": "twu-",
+    "output": "src/styles/components.css"
+  },
+  "apply": {
+    "output": "src/styles/components.css"
+  }
+}
+```
+
+| Key | Description |
+|-----|-------------|
+| `include` / `exclude` | Glob patterns for file scanning |
+| `names` | Custom class names (utilities string → base name, prefix added automatically) |
+| `analyze` / `generate` / `apply` | Per-command overrides (`minOccurrences`, `top`, `prefix`, `output`, …) |
+
+Config is discovered from the current directory **and** ancestors of `<path>`. CLI flags override config values.
+
+```bash
+npx tailwind-unwind analyze ./src --config ./tailwind-unwind.config.json
+npx tailwind-unwind generate ./src --include "src/components/**/*.tsx"
+```
 
 ## Quick start
 
@@ -57,6 +105,9 @@ npx tailwind-unwind analyze <path>
 | `--top <n>` | `10` | Number of top combinations to show |
 | `--format <type>` | `console` | Output format: `console` or `json` |
 | `--no-dedupe-subsets` | — | Include subset combinations in results |
+| `--config <file>` | — | Path to config file |
+| `--include <patterns>` | all `src` | Comma-separated glob include patterns |
+| `--exclude <patterns>` | — | Comma-separated glob exclude patterns |
 
 ```bash
 # JSON report for CI
@@ -80,6 +131,7 @@ Unique class combinations: 89
 1. "flex items-center justify-between p-4"
    Occurrences: 24
    Suggestion: .page-header
+   Extractable: yes — use generate/apply
    Found in: src/components/Header.tsx:12, src/layout/Toolbar.tsx:5 (+18 more)
 
 💡 Potential code reduction: 38%
@@ -193,7 +245,18 @@ Generated classes use a **`twu-` prefix** by default to avoid conflicts with exi
 | `grid grid-cols-3 gap-4` | `twu-card-grid` |
 | `fixed inset-0 bg-black/50` | `twu-backdrop` |
 
-Customize with `--prefix app-` → `.app-page-header`, etc.
+Customize with `--prefix app-` or the `names` field in config:
+
+```json
+{
+  "names": {
+    "flex items-center justify-between p-4": "page-header"
+  },
+  "generate": { "prefix": "app-" }
+}
+```
+
+→ `.app-page-header`
 
 ---
 
