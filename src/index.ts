@@ -1,8 +1,15 @@
 export { analyzeCommand } from './commands/analyze.js';
+export { applyCommand } from './commands/apply.js';
+export { generateCommand } from './commands/generate.js';
+export { scanProject } from './core/scanProject.js';
+export { buildComponents } from './core/buildComponents.js';
+export { replaceClassNamesInSource } from './codemod/replaceClassNames.js';
 export {
   calculatePotentialReduction,
   findFrequentPatterns,
+  findRepeatedClassSets,
 } from './analyzer/patternFinder.js';
+export { suggestClassName } from './analyzer/suggestions.js';
 export {
   dedupeSubsetCombinations,
   isStrictSubset,
@@ -13,9 +20,23 @@ export {
   splitClassString,
 } from './analyzer/combiner.js';
 export {
+  assignComponentClassNames,
+  generateComponentCss,
+} from './generator/cssGenerator.js';
+export {
+  DEFAULT_CLASS_PREFIX,
+  normalizeClassPrefix,
+  withClassPrefix,
+} from './generator/classPrefix.js';
+export {
   CLASS_MERGE_CALLEES,
   extractClassesFromExpression,
 } from './parser/classHelpers.js';
+export {
+  extractFromJSXAttribute,
+  isClassAttribute,
+  parseSourceToAst,
+} from './parser/ast.js';
 export { parseFile, parseSource } from './parser/jsxParser.js';
 export { walkSourceFiles } from './scanner/fileWalker.js';
 export { printConsoleReport } from './reporters/consoleReporter.js';
@@ -31,3 +52,18 @@ export type {
   CombinationLocation,
   ParseResult,
 } from './parser/types.js';
+export type {
+  CssGeneratorOptions,
+  CssGeneratorResult,
+  GeneratedComponent,
+} from './generator/cssGenerator.js';
+export type {
+  GenerateOptions,
+  GenerateResult,
+} from './commands/generate.js';
+export type { ApplyOptions, ApplyResult } from './commands/apply.js';
+export type {
+  ClassReplacement,
+  ReplaceClassNamesResult,
+  SkippedReplacement,
+} from './codemod/replaceClassNames.js';

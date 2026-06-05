@@ -3,6 +3,7 @@ import type {
   ClassNameOccurrence,
   CombinationLocation,
 } from '../parser/types.js';
+import { suggestClassName } from './suggestions.js';
 import { dedupeSubsetCombinations } from './dedupe.js';
 import { generateCombinations, normalizeClasses } from './combiner.js';
 
@@ -10,22 +11,6 @@ const DEFAULT_MIN_COMBINATION_SIZE = 2;
 const DEFAULT_MAX_COMBINATION_SIZE = 5;
 const DEFAULT_MIN_OCCURRENCES = 5;
 const DEFAULT_TOP_LIMIT = 10;
-
-/** Heuristic: turn a class combo into a suggested CSS class name. */
-function suggestClassName(classes: string[]): string {
-  const keywords = classes
-    .map((cls) =>
-      cls
-        .replace(/^(sm|md|lg|xl|2xl):/g, '')
-        .replace(/[^a-z0-9-]/gi, '-')
-        .replace(/^-+|-+$/g, ''),
-    )
-    .filter(Boolean);
-
-  const unique = [...new Set(keywords)].slice(0, 3);
-  const base = unique.join('-') || 'component';
-  return `.${base}`;
-}
 
 export interface PatternFinderOptions {
   minOccurrences?: number;
@@ -105,7 +90,7 @@ export function findFrequentPatterns(
       normalized,
       classes: value.classes,
       occurrences: value.count,
-      suggestion: suggestClassName(value.classes),
+      suggestion: `.${suggestClassName(value.classes)}`,
       locations: value.locations,
     }))
     .sort((a, b) => {
@@ -120,6 +105,69 @@ export function findFrequentPatterns(
   }
 
   return frequent.slice(0, topLimit);
+}
+
+/**
+ * Find exact duplicate className sets (full class lists per element).
+ * Better suited for CSS generation than combinatorial subset search.
+ */
+export function findRepeatedClassSets(
+  occurrences: ClassNameOccurrence[],
+  options: PatternFinderOptions = {},
+): ClassCombination[] {
+  const minOccurrences = options.minOccurrences ?? 3;
+  const minSize = options.minSize ?? 2;
+  const maxSize = options.maxSize ?? DEFAULT_MAX_COMBINATION_SIZE;
+  const topLimit = options.topLimit ?? DEFAULT_TOP_LIMIT;
+
+  const frequency = new Map<string, FrequencyEntry>();
+
+  for (const occurrence of occurrences) {
+    const uniqueInElement = [...new Set(occurrence.classes)];
+
+    if (uniqueInElement.length < minSize || uniqueInElement.length > maxSize) {
+      continue;
+    }
+
+    const normalized = normalizeClasses(uniqueInElement);
+    const location: CombinationLocation = {
+      filePath: occurrence.filePath,
+      line: occurrence.line,
+    };
+
+    const existing = frequency.get(normalized);
+
+    if (existing) {
+      existing.count += 1;
+      const key = locationKey(location);
+      if (!existing.locations.some((loc) => locationKey(loc) === key)) {
+        existing.locations.push(location);
+      }
+    } else {
+      frequency.set(normalized, {
+        classes: [...uniqueInElement].sort(),
+        count: 1,
+        locations: [location],
+      });
+    }
+  }
+
+  return [...frequency.entries()]
+    .filter(([, value]) => value.count >= minOccurrences)
+    .map(([normalized, value]) => ({
+      normalized,
+      classes: value.classes,
+      occurrences: value.count,
+      suggestion: `.${suggestClassName(value.classes)}`,
+      locations: value.locations,
+    }))
+    .sort((a, b) => {
+      if (b.occurrences !== a.occurrences) {
+        return b.occurrences - a.occurrences;
+      }
+      return b.classes.length - a.classes.length;
+    })
+    .slice(0, topLimit);
 }
 
 /**

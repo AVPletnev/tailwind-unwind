@@ -51,4 +51,6 @@ export interface AnalyzeOptions {
   top?: number;
   format?: 'console' | 'json';
   dedupeSubsets?: boolean;
+  /** Namespace prefix for generated component classes (default: twu-) */
+  prefix?: string;
 }

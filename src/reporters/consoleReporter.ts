@@ -84,7 +84,12 @@ export function printConsoleReport(
   );
   console.log(
     chalk.magenta(
-      '💡 Upgrade to premium: npx tailwind-unwind generate <path> --output styles.css',
+      '💡 Generate CSS: npx tailwind-unwind generate <path> --output styles.css',
+    ),
+  );
+  console.log(
+    chalk.magenta(
+      '💡 Apply classes: npx tailwind-unwind apply <path> --output styles.css',
     ),
   );
   console.log('');

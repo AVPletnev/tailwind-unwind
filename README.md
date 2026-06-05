@@ -39,6 +39,50 @@ npx tailwind-unwind analyze ./src --min-occurrences 10 --top 5
 
 Scan a directory recursively for `.tsx`, `.jsx`, `.ts`, and `.js` files. The tool ignores `node_modules`, `.next`, `dist`, `build`, and `.git`.
 
+### Generate CSS
+
+Extract **exact duplicate className strings** into reusable component classes:
+
+```bash
+npx tailwind-unwind generate ./src --output styles.css
+# Custom namespace (default: twu-)
+npx tailwind-unwind generate ./src --output styles.css --prefix app-
+```
+
+Unlike `analyze` (which finds frequent subsets), `generate` looks for identical full class lists on JSX elements. Default `--min-occurrences` is `3`.
+
+Example output file:
+
+```css
+@layer components {
+  .twu-toolbar {
+    @apply flex items-center justify-between p-4;
+  }
+
+  .twu-media-cover {
+    @apply w-full h-auto object-cover rounded-lg;
+  }
+}
+```
+
+Import the generated file in your global CSS (e.g. `globals.css`), then replace repeated `className` strings with the new classes.
+
+Supports filter flags: `--min-occurrences`, `--min-size`, `--max-size`, `--top`.
+
+### Apply (replace className in source)
+
+Generate CSS **and** replace matching `className` strings in your `.tsx`/`.jsx` files:
+
+```bash
+# Preview changes without writing files
+npx tailwind-unwind apply ./src --output styles.css --dry-run
+
+# Apply replacements and write styles.css
+npx tailwind-unwind apply ./src --output styles.css
+```
+
+Only **exact static matches** are replaced (string literals and static `cn()`/`clsx()` calls). Dynamic expressions are left unchanged.
+
 ### Example output
 
 ```
@@ -59,7 +103,7 @@ Unique class combinations: 4
    Suggestion: .w-full-h-auto-object-cover
 
 💡 Potential code reduction: 42%
-💡 Upgrade to premium: npx tailwind-unwind generate <path> --output styles.css
+💡 Generate CSS: npx tailwind-unwind generate <path> --output styles.css
 ```
 
 ## What it analyzes
@@ -104,6 +148,8 @@ npm install
 npm run build
 npm test
 node bin/index.js analyze ./test-project
+node bin/index.js generate ./test-project --output styles.css
+node bin/index.js apply ./test-project --output styles.css --dry-run
 ```
 
 ## License
