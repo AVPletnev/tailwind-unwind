@@ -13,6 +13,9 @@ const KNOWN_ROOT_KEYS = new Set([
   'top',
   'dedupeSubsets',
   'dryRun',
+  'prettier',
+  'fromReport',
+  'extractableOnly',
   'analyze',
   'generate',
   'apply',
@@ -27,6 +30,9 @@ const KNOWN_COMMAND_KEYS = new Set([
   'output',
   'dedupeSubsets',
   'dryRun',
+  'prettier',
+  'fromReport',
+  'extractableOnly',
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -100,6 +106,15 @@ function validateCommandSection(
   assertPositiveNumber(value.top, `${section}.top`, errors);
   assertBoolean(value.dedupeSubsets, `${section}.dedupeSubsets`, errors);
   assertBoolean(value.dryRun, `${section}.dryRun`, errors);
+  assertBoolean(value.prettier, `${section}.prettier`, errors);
+  assertBoolean(value.extractableOnly, `${section}.extractableOnly`, errors);
+
+  if (
+    value.fromReport !== undefined &&
+    (typeof value.fromReport !== 'string' || value.fromReport.length === 0)
+  ) {
+    errors.push(`${section}.fromReport must be a non-empty string`);
+  }
 
   if (
     value.prefix !== undefined &&
@@ -165,6 +180,16 @@ export function validateConfigFile(raw: unknown, configPath: string): void {
   assertPositiveNumber(source.top, 'top', errors);
   assertBoolean(source.dedupeSubsets, 'dedupeSubsets', errors);
   assertBoolean(source.dryRun, 'dryRun', errors);
+  assertBoolean(source.prettier, 'prettier', errors);
+  assertBoolean(source.extractableOnly, 'extractableOnly', errors);
+
+  if (
+    source.fromReport !== undefined &&
+    (typeof source.fromReport !== 'string' || source.fromReport.length === 0)
+  ) {
+    errors.push('fromReport must be a non-empty string');
+  }
+
   validateNames(source.names, errors);
   validateCommandSection(source.analyze, 'analyze', errors);
   validateCommandSection(source.generate, 'generate', errors);

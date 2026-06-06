@@ -2,6 +2,7 @@ import { parse } from '@babel/parser';
 import type { JSXAttribute, Node } from '@babel/types';
 import type { ClassNameExtraction } from './types.js';
 import { extractClassesFromExpression } from './classHelpers.js';
+import type { VariantRegistry } from './variantHelpers.js';
 
 export const PARSER_PLUGINS = [
   'jsx',
@@ -31,6 +32,7 @@ export function isClassAttribute(attr: JSXAttribute): boolean {
 /** Extract Tailwind classes from a className/class JSX attribute. */
 export function extractFromJSXAttribute(
   attr: JSXAttribute,
+  registry?: VariantRegistry,
 ): ClassNameExtraction | null {
   if (!isClassAttribute(attr)) {
     return null;
@@ -44,7 +46,7 @@ export function extractFromJSXAttribute(
   }
 
   if (value.type === 'StringLiteral') {
-    const result = extractClassesFromExpression(value);
+    const result = extractClassesFromExpression(value, registry);
     return { classes: result.classes, isDynamic: result.isDynamic, line };
   }
 
@@ -55,7 +57,7 @@ export function extractFromJSXAttribute(
       return { classes: [], isDynamic: true, line };
     }
 
-    const result = extractClassesFromExpression(expr);
+    const result = extractClassesFromExpression(expr, registry);
     return { classes: result.classes, isDynamic: result.isDynamic, line };
   }
 

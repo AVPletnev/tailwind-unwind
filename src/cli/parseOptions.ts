@@ -35,6 +35,9 @@ export interface RawCliOptions {
   output?: string;
   format?: string;
   dryRun?: boolean;
+  prettier?: boolean;
+  fromReport?: string;
+  extractableOnly?: boolean;
 }
 
 function cliNumber(
@@ -68,8 +71,11 @@ export async function resolveCommandOptions(
       include: splitPatterns(opts.include),
       exclude: splitPatterns(opts.exclude),
       output: opts.output,
-      dryRun: opts.dryRun,
-    },
+    dryRun: opts.dryRun,
+    prettier: opts.prettier,
+    fromReport: opts.fromReport,
+    extractableOnly: opts.extractableOnly,
+  },
     { targetPath },
   );
 
@@ -87,6 +93,9 @@ export async function resolveCommandOptions(
     names: resolved.names,
     format: opts.format === 'json' ? 'json' : 'console',
     dryRun: opts.dryRun ?? resolved.dryRun,
+    prettier: opts.prettier ?? resolved.prettier,
+    fromReport: opts.fromReport ?? resolved.fromReport,
+    extractableOnly: opts.extractableOnly ?? resolved.extractableOnly,
   };
 }
 

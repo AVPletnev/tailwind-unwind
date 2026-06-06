@@ -7,6 +7,11 @@ import type {
   TemplateLiteral,
 } from '@babel/types';
 import { splitClassString } from '../analyzer/combiner.js';
+import {
+  type VariantRegistry,
+  extractClassesFromVariantCall,
+  isVariantCallee,
+} from './variantHelpers.js';
 
 /** Utilities commonly used to merge Tailwind class strings. */
 export const CLASS_MERGE_CALLEES = new Set([
@@ -71,6 +76,7 @@ function isClassMergeCallee(expression: Expression): boolean {
 
 function extractFromCallArguments(
   args: CallExpression['arguments'],
+  registry?: VariantRegistry,
 ): ExtractedClasses {
   const parts: ExtractedClasses[] = [];
 
@@ -80,7 +86,7 @@ function extractFromCallArguments(
       continue;
     }
 
-    parts.push(extractClassesFromExpression(arg));
+    parts.push(extractClassesFromExpression(arg, registry));
   }
 
   return mergeExtractions(parts);
@@ -90,8 +96,34 @@ function extractFromCallArguments(
  * Recursively pull static Tailwind tokens from JSX className expressions.
  * Unknown/dynamic fragments set `isDynamic: true` but may still yield partial classes.
  */
+function extractFromVariantCall(
+  call: CallExpression,
+  registry?: VariantRegistry,
+): ExtractedClasses {
+  const { callee } = call;
+
+  if (callee.type !== 'V8IntrinsicIdentifier' && isVariantCallee(callee)) {
+    const classes = extractClassesFromVariantCall(call);
+    const hasDynamicArgs = call.arguments.some(
+      (arg) =>
+        arg.type === 'SpreadElement' || arg.type === 'ArgumentPlaceholder',
+    );
+
+    return { classes, isDynamic: hasDynamicArgs };
+  }
+
+  if (callee.type === 'Identifier' && registry?.has(callee.name)) {
+    const classes = registry.get(callee.name) ?? [];
+    const hasArgs = call.arguments.length > 0;
+    return { classes, isDynamic: hasArgs };
+  }
+
+  return { classes: [], isDynamic: true };
+}
+
 export function extractClassesFromExpression(
   expression: Expression,
+  registry?: VariantRegistry,
 ): ExtractedClasses {
   switch (expression.type) {
     case 'StringLiteral':
@@ -103,29 +135,35 @@ export function extractClassesFromExpression(
     case 'CallExpression': {
       const { callee } = expression;
       if (callee.type !== 'V8IntrinsicIdentifier' && isClassMergeCallee(callee)) {
-        return extractFromCallArguments(expression.arguments);
+        return extractFromCallArguments(expression.arguments, registry);
       }
+
+      const variantExtraction = extractFromVariantCall(expression, registry);
+      if (variantExtraction.classes.length > 0 || !variantExtraction.isDynamic) {
+        return variantExtraction;
+      }
+
       return { classes: [], isDynamic: true };
     }
 
     case 'ConditionalExpression': {
       const merged = mergeExtractions([
-        extractClassesFromExpression(expression.consequent),
-        extractClassesFromExpression(expression.alternate),
+        extractClassesFromExpression(expression.consequent, registry),
+        extractClassesFromExpression(expression.alternate, registry),
       ]);
       return { ...merged, isDynamic: true };
     }
 
     case 'LogicalExpression': {
       const merged = mergeExtractions([
-        extractClassesFromExpression(expression.left),
-        extractClassesFromExpression(expression.right),
+        extractClassesFromExpression(expression.left, registry),
+        extractClassesFromExpression(expression.right, registry),
       ]);
       return { ...merged, isDynamic: true };
     }
 
     case 'ArrayExpression':
-      return extractFromArrayExpression(expression);
+      return extractFromArrayExpression(expression, registry);
 
     case 'ObjectExpression':
       // clsx object form: { 'p-4': isActive } — keys are potential classes
@@ -136,7 +174,10 @@ export function extractClassesFromExpression(
   }
 }
 
-function extractFromArrayExpression(node: ArrayExpression): ExtractedClasses {
+function extractFromArrayExpression(
+  node: ArrayExpression,
+  registry?: VariantRegistry,
+): ExtractedClasses {
   const parts: ExtractedClasses[] = [];
 
   for (const element of node.elements) {
@@ -145,7 +186,7 @@ function extractFromArrayExpression(node: ArrayExpression): ExtractedClasses {
       continue;
     }
 
-    parts.push(extractClassesFromExpression(element));
+    parts.push(extractClassesFromExpression(element, registry));
   }
 
   return mergeExtractions(parts);

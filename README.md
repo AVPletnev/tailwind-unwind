@@ -159,11 +159,15 @@ npx tailwind-unwind generate <path> --output <file.css>
 | `--max-size <n>` | `5` | Maximum classes per set |
 | `--top <n>` | `10` | Max number of component classes to generate |
 | `--prefix <name>` | `twu-` | Namespace prefix for generated classes |
+| `--format <type>` | `console` | Output format: `console` or `json` |
+| `--from-report <file>` | — | Generate from `analyze --format json` output |
+| `--extractable-only` | — | Only patterns marked extractable in analyze |
 
 ```bash
 npx tailwind-unwind generate ./src --output styles.css
-npx tailwind-unwind generate ./src --output styles.css --prefix app-
-npx tailwind-unwind generate ./src --output styles.css --min-occurrences 2 --top 20
+npx tailwind-unwind analyze ./src --format json > report.json
+npx tailwind-unwind generate --from-report report.json --output styles.css
+npx tailwind-unwind generate ./src --output styles.css --extractable-only --format json
 ```
 
 **Example output (`styles.css`):**
@@ -206,10 +210,13 @@ Supports the same flags as `generate`, plus:
 | Flag | Description |
 |------|-------------|
 | `--dry-run` | Preview replacements without writing files |
+| `--prettier` | Format modified files with Prettier (optional peer dependency) |
+| `--format json` | Machine-readable output for CI |
 
 ```bash
 npx tailwind-unwind apply ./src --output styles.css --dry-run
-npx tailwind-unwind apply ./src --output styles.css
+npx tailwind-unwind apply ./src --output styles.css --prettier
+npx tailwind-unwind apply ./src --output styles.css --from-report report.json --format json
 ```
 
 **What gets replaced:**
@@ -218,8 +225,10 @@ npx tailwind-unwind apply ./src --output styles.css
 |---------|-----------|
 | `className="flex items-center p-4"` | ✅ |
 | `className={cn('flex', 'items-center', 'p-4')}` | ✅ (static args only) |
+| `className={cn('flex p-4', isActive && 'bg-blue')}` | ✅ partial |
+| `` className={`flex p-4 ${active ? 'bg-blue' : ''}`} `` | ✅ partial (static part) |
+| `className={buttonVariants()}` | ✅ (cva/tv, no args) |
 | `className={getClasses()}` | ❌ skipped |
-| `` className={`flex ${active ? 'p-4' : ''}`} `` | ❌ skipped (dynamic) |
 
 **Before → After:**
 
@@ -267,6 +276,7 @@ Scans `.tsx`, `.jsx`, `.ts`, `.js` recursively. Ignores `node_modules`, `.next`,
 - **Static strings:** `className="flex p-4"` / `class="flex p-4"`
 - **Template literals:** static segments extracted; `${...}` expressions flagged
 - **Merge utilities:** `cn()`, `clsx()`, `classnames()`, `twMerge()`, `cx()`
+- **Variant APIs:** `cva()`, `tv()` definitions and no-arg calls like `buttonVariants()`
 - **Dynamic expressions:** `className={getClasses()}` — warning, skipped
 
 Class order is normalized: `flex p-4` and `p-4 flex` are treated as the same set.

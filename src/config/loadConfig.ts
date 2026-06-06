@@ -62,6 +62,18 @@ function pickCommandConfig(source: Record<string, unknown>): CommandConfig {
     config.dryRun = source.dryRun;
   }
 
+  if (typeof source.prettier === 'boolean') {
+    config.prettier = source.prettier;
+  }
+
+  if (typeof source.fromReport === 'string' && source.fromReport.length > 0) {
+    config.fromReport = source.fromReport;
+  }
+
+  if (typeof source.extractableOnly === 'boolean') {
+    config.extractableOnly = source.extractableOnly;
+  }
+
   return config;
 }
 

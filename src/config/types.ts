@@ -9,6 +9,9 @@ export interface CommandConfig {
   output?: string;
   dedupeSubsets?: boolean;
   dryRun?: boolean;
+  prettier?: boolean;
+  fromReport?: string;
+  extractableOnly?: boolean;
 }
 
 /** Keys are space-separated utility strings; values are base class names (without prefix). */

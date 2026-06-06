@@ -4,7 +4,7 @@ import {
   generateComponentCss,
   type GeneratedComponent,
 } from '../generator/cssGenerator.js';
-import type { ClassNameOccurrence } from '../parser/types.js';
+import type { ClassCombination, ClassNameOccurrence } from '../parser/types.js';
 import type { PatternFinderOptions } from '../analyzer/patternFinder.js';
 
 export interface BuildComponentsOptions extends PatternFinderOptions {
@@ -31,6 +31,28 @@ export function buildComponents(
     topLimit: options.topLimit,
   });
 
+  const { css, components } = generateComponentCss({
+    sourcePath: options.sourcePath,
+    combinations,
+    prefix: options.prefix,
+    names: options.names,
+  });
+
+  const replacementMap = new Map<string, string>();
+
+  for (const component of components) {
+    const key = [...component.classes].sort().join(' ');
+    replacementMap.set(key, component.className);
+  }
+
+  return { components, css, replacementMap };
+}
+
+/** Build components from pre-selected combinations (e.g. analyze report). */
+export function buildComponentsFromCombinations(
+  combinations: ClassCombination[],
+  options: BuildComponentsOptions,
+): BuildComponentsResult {
   const { css, components } = generateComponentCss({
     sourcePath: options.sourcePath,
     combinations,

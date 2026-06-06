@@ -60,4 +60,7 @@ export interface AnalyzeOptions {
   configPath?: string;
   /** Custom base class names keyed by space-separated utility strings */
   names?: Record<string, string>;
+  prettier?: boolean;
+  fromReport?: string;
+  extractableOnly?: boolean;
 }

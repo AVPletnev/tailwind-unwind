@@ -19,6 +19,7 @@ import {
   isClassAttribute,
   parseSourceToAst,
 } from '../parser/ast.js';
+import { collectVariantRegistry } from '../parser/variantHelpers.js';
 
 type TraverseFn = (
   ast: Node,
@@ -223,9 +224,10 @@ function tryReplaceMergeCall(
   };
 }
 
-function tryReplaceClassAttribute(
+function tryReplaceTemplateLiteral(
   attr: JSXAttribute,
   replacementMap: Map<string, string>,
+  registry: ReturnType<typeof collectVariantRegistry>,
 ): MergeCallReplacement | null {
   const value = attr.value;
   if (value?.type !== 'JSXExpressionContainer') {
@@ -233,11 +235,61 @@ function tryReplaceClassAttribute(
   }
 
   const expression = value.expression;
-  if (expression.type === 'JSXEmptyExpression' || !isClassMergeCall(expression)) {
+  if (expression.type !== 'TemplateLiteral' || expression.expressions.length === 0) {
     return null;
   }
 
-  return tryReplaceMergeCall(expression, replacementMap);
+  const extracted = extractClassesFromExpression(expression, registry);
+  if (extracted.classes.length === 0) {
+    return null;
+  }
+
+  const key = normalizeClasses(extracted.classes);
+  const replacement = replacementMap.get(key);
+  if (!replacement) {
+    return null;
+  }
+
+  const newQuasis = expression.quasis.map((quasi, index) => {
+    if (index !== 0) {
+      return quasi;
+    }
+
+    const prefix = expression.expressions.length > 0 ? `${replacement} ` : replacement;
+    return t.templateElement(
+      { raw: prefix, cooked: prefix },
+      quasi.tail,
+    );
+  });
+
+  return {
+    expression: t.templateLiteral(newQuasis, [...expression.expressions]),
+    from: key,
+    to: replacement,
+    partial: true,
+  };
+}
+
+function tryReplaceClassAttribute(
+  attr: JSXAttribute,
+  replacementMap: Map<string, string>,
+  registry: ReturnType<typeof collectVariantRegistry>,
+): MergeCallReplacement | null {
+  const value = attr.value;
+  if (value?.type !== 'JSXExpressionContainer') {
+    return null;
+  }
+
+  const expression = value.expression;
+  if (expression.type === 'JSXEmptyExpression') {
+    return null;
+  }
+
+  if (isClassMergeCall(expression)) {
+    return tryReplaceMergeCall(expression, replacementMap);
+  }
+
+  return tryReplaceTemplateLiteral(attr, replacementMap, registry);
 }
 
 /**
@@ -265,6 +317,8 @@ export function replaceClassNamesInSource(
     throw new Error(`Failed to parse ${filePath}: ${message}`);
   }
 
+  const variantRegistry = collectVariantRegistry(ast);
+
   traverse(ast, {
     JSXElement(path: NodePath<JSXElement>) {
       const opening = path.node.openingElement;
@@ -274,10 +328,14 @@ export function replaceClassNamesInSource(
           continue;
         }
 
-        const extraction = extractFromJSXAttribute(attr);
+        const extraction = extractFromJSXAttribute(attr, variantRegistry);
         if (!extraction) continue;
 
-        const mergeReplacement = tryReplaceClassAttribute(attr, replacementMap);
+        const mergeReplacement = tryReplaceClassAttribute(
+          attr,
+          replacementMap,
+          variantRegistry,
+        );
         if (mergeReplacement) {
           if (mergeReplacement.expression.type === 'StringLiteral') {
             setStringClassAttribute(attr, mergeReplacement.expression.value);

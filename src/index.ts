@@ -11,7 +11,22 @@ export { analyzeCommand } from './commands/analyze.js';
 export { applyCommand } from './commands/apply.js';
 export { generateCommand } from './commands/generate.js';
 export { scanProject } from './core/scanProject.js';
-export { buildComponents } from './core/buildComponents.js';
+export {
+  buildComponents,
+  buildComponentsFromCombinations,
+} from './core/buildComponents.js';
+export { loadExtractableCombinations } from './core/loadAnalyzeReport.js';
+export { formatSource, formatModifiedFiles } from './codemod/formatSource.js';
+export {
+  printGenerateJsonReport,
+  printApplyJsonReport,
+} from './reporters/operationJsonReporter.js';
+export {
+  VARIANT_CALLEES,
+  collectVariantRegistry,
+  extractClassesFromVariantCall,
+  isVariantCallee,
+} from './parser/variantHelpers.js';
 export { replaceClassNamesInSource } from './codemod/replaceClassNames.js';
 export {
   calculatePotentialReduction,

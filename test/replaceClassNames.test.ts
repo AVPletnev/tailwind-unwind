@@ -63,6 +63,21 @@ describe('replaceClassNamesInSource', () => {
     expect(result.source).toContain('active');
   });
 
+  it('partially replaces template literals when dynamic expressions remain', () => {
+    const source = `<button className={\`flex items-center justify-between p-4 \${active ? 'bg-blue' : ''}\`}>Tab</button>`;
+    const result = replaceClassNamesInSource(
+      source,
+      replacementMap,
+      'Test.tsx',
+    );
+
+    expect(result.changed).toBe(true);
+    expect(result.replacements[0]?.partial).toBe(true);
+    expect(result.source).toContain('twu-toolbar');
+    expect(result.source).toContain('active');
+    expect(result.source).not.toContain('justify-between p-4');
+  });
+
   it('skips dynamic className expressions', () => {
     const source = `<div className={getClasses()}>A</div>`;
     const result = replaceClassNamesInSource(

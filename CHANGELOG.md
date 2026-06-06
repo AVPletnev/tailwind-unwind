@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0
+
+### Added
+- `--format json` for `generate` and `apply` commands
+- `--prettier` on `apply` to format modified files when Prettier is available
+- `--from-report <file>` to generate/apply from analyze JSON output
+- `--extractable-only` to align generate/apply with analyze extractable patterns
+- Partial replacement in template literals with dynamic expressions
+- `cva()` / `tv()` parser support with variant registry
+- `buildComponentsFromCombinations` API for report-driven workflows
+
 ## 0.2.0
 
 ### Added

@@ -8,6 +8,7 @@ import {
   isClassAttribute,
   parseSourceToAst,
 } from './ast.js';
+import { collectVariantRegistry } from './variantHelpers.js';
 
 type TraverseFn = (
   ast: Node,
@@ -42,6 +43,7 @@ function collectExtractionsFromAst(
 ): { extractions: ClassNameExtraction[]; warnings: string[] } {
   const extractions: ClassNameExtraction[] = [];
   const warnings: string[] = [];
+  const variantRegistry = collectVariantRegistry(ast);
 
   traverse(ast, {
     JSXElement(path: NodePath<JSXElement>) {
@@ -54,7 +56,7 @@ function collectExtractionsFromAst(
       for (const attr of opening.attributes) {
         if (attr.type !== 'JSXAttribute') continue;
 
-        const extraction = extractFromJSXAttribute(attr);
+        const extraction = extractFromJSXAttribute(attr, variantRegistry);
         if (!extraction) continue;
 
         if (extraction.isDynamic && extraction.classes.length === 0) {

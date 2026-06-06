@@ -14,11 +14,14 @@
     "minOccurrences": 3,
     "prefix": "twu-",
     "output": "src/styles/components.css",
-    "top": 20
+    "top": 20,
+    "fromReport": "report.json",
+    "extractableOnly": true
   },
   "apply": {
     "minOccurrences": 3,
     "prefix": "twu-",
-    "output": "src/styles/components.css"
+    "output": "src/styles/components.css",
+    "prettier": true
   }
 }

@@ -72,14 +72,17 @@ addSharedOptions(
   program
     .command('generate')
     .description('Generate @layer components CSS from repeated className sets')
-    .argument('<path>', 'Directory to analyze')
-    .requiredOption('--output <file>', 'Output CSS file path')
+    .argument('[path]', 'Directory to analyze')
+    .option('--output <file>', 'Output CSS file path')
+    .option('--from-report <file>', 'Generate from analyze JSON report')
+    .option('--extractable-only', 'Only generate extractable patterns from analyze')
+    .option('--format <type>', 'Output format: console or json', 'console')
     .option('--min-occurrences <n>', 'Minimum occurrences threshold')
     .option('--min-size <n>', 'Minimum classes per combination')
     .option('--max-size <n>', 'Maximum classes per combination')
     .option('--top <n>', 'Number of combinations to generate')
     .option('--prefix <name>', 'Namespace prefix for generated classes'),
-).action(async (targetPath: string, opts) => {
+).action(async (targetPath: string | undefined, opts) => {
   try {
     const resolved = withNumericDefaults(
       await resolveCommandOptions('generate', opts, targetPath),
@@ -87,13 +90,19 @@ addSharedOptions(
       GENERATE_DEFAULTS,
     );
     const output = opts.output ?? resolved.output;
+    const scanPath = targetPath ?? '.';
 
     if (!output) {
       console.error(chalk.red('Error: --output is required'));
       process.exit(1);
     }
 
-    await generateCommand(targetPath, {
+    if (!opts.fromReport && !resolved.fromReport && !targetPath) {
+      console.error(chalk.red('Error: <path> is required without --from-report'));
+      process.exit(1);
+    }
+
+    await generateCommand(scanPath, {
       output,
       minOccurrences: resolved.minOccurrences,
       minSize: resolved.minSize,
@@ -104,6 +113,9 @@ addSharedOptions(
       exclude: resolved.exclude,
       configPath: resolved.configPath,
       names: resolved.names,
+      format: resolved.format,
+      fromReport: opts.fromReport ?? resolved.fromReport,
+      extractableOnly: Boolean(opts.extractableOnly || resolved.extractableOnly),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -117,7 +129,11 @@ addSharedOptions(
     .command('apply')
     .description('Replace repeated className strings with generated component classes')
     .argument('<path>', 'Directory to modify')
-    .requiredOption('--output <file>', 'Output CSS file path')
+    .option('--output <file>', 'Output CSS file path')
+    .option('--from-report <file>', 'Use component list from analyze JSON report')
+    .option('--extractable-only', 'Only apply extractable patterns from analyze')
+    .option('--format <type>', 'Output format: console or json', 'console')
+    .option('--prettier', 'Format modified files with Prettier when available')
     .option('--min-occurrences <n>', 'Minimum occurrences threshold')
     .option('--min-size <n>', 'Minimum classes per combination')
     .option('--max-size <n>', 'Maximum classes per combination')
@@ -149,7 +165,13 @@ addSharedOptions(
       exclude: resolved.exclude,
       configPath: resolved.configPath,
       names: resolved.names,
-      dryRun: Boolean(resolved.dryRun),
+      format: resolved.format,
+      fromReport: opts.fromReport ?? resolved.fromReport,
+      extractableOnly: Boolean(opts.extractableOnly || resolved.extractableOnly),
+      dryRun: process.argv.includes('--dry-run')
+        ? true
+        : Boolean(resolved.dryRun),
+      prettier: Boolean(opts.prettier || resolved.prettier),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

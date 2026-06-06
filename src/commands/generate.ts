@@ -1,9 +1,17 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import chalk from 'chalk';
-import { buildComponents } from '../core/buildComponents.js';
+import {
+  buildComponents,
+  buildComponentsFromCombinations,
+} from '../core/buildComponents.js';
+import { loadExtractableCombinations } from '../core/loadAnalyzeReport.js';
 import { scanProject } from '../core/scanProject.js';
 import type { AnalyzeOptions } from '../parser/types.js';
+import {
+  printGenerateJsonReport,
+  type GenerateJsonReport,
+} from '../reporters/operationJsonReporter.js';
 
 export interface GenerateOptions extends AnalyzeOptions {
   output: string;
@@ -12,7 +20,8 @@ export interface GenerateOptions extends AnalyzeOptions {
 export interface GenerateResult {
   outputPath: string;
   componentsGenerated: number;
-  report: Awaited<ReturnType<typeof scanProject>>['report'];
+  components: Awaited<ReturnType<typeof buildComponents>>['components'];
+  report: Awaited<ReturnType<typeof scanProject>>['report'] | null;
 }
 
 /**
@@ -22,37 +31,92 @@ export async function generateCommand(
   targetPath: string,
   options: GenerateOptions,
 ): Promise<GenerateResult> {
-  let scanResult;
+  let scanResult: Awaited<ReturnType<typeof scanProject>> | null = null;
+  let components: GenerateResult['components'];
+  let css: string;
 
   try {
-    scanResult = await scanProject({
-      targetPath,
-      include: options.include,
-      exclude: options.exclude,
-    });
+    if (options.fromReport) {
+      const loadedReport = await loadExtractableCombinations(options.fromReport, {
+        extractableOnly: options.extractableOnly ?? true,
+      });
+
+      const built = buildComponentsFromCombinations(loadedReport.combinations, {
+        sourcePath: loadedReport.targetPath || targetPath,
+        prefix: options.prefix,
+        names: options.names,
+      });
+      components = built.components;
+      css = built.css;
+    } else {
+      scanResult = await scanProject({
+        targetPath,
+        include: options.include,
+        exclude: options.exclude,
+        extractableMinOccurrences: options.minOccurrences ?? 3,
+      });
+
+      if (options.extractableOnly) {
+        const combinations = scanResult.report.stats.topCombinations.filter(
+          (combo) => combo.extractable,
+        );
+
+        const built = buildComponentsFromCombinations(combinations, {
+          sourcePath: scanResult.resolvedPath,
+          prefix: options.prefix,
+          names: options.names,
+        });
+        components = built.components;
+        css = built.css;
+      } else {
+        const built = buildComponents(scanResult.occurrences, {
+          sourcePath: scanResult.resolvedPath,
+          minOccurrences: options.minOccurrences ?? 3,
+          minSize: options.minSize,
+          maxSize: options.maxSize,
+          topLimit: options.top,
+          prefix: options.prefix,
+          names: options.names,
+        });
+        components = built.components;
+        css = built.css;
+      }
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(chalk.red(`Error: ${message}`));
     process.exit(1);
   }
 
-  for (const warning of scanResult.warnings) {
-    console.warn(chalk.yellow(`⚠ ${warning}`));
+  if (scanResult) {
+    for (const warning of scanResult.warnings) {
+      if (options.format !== 'json') {
+        console.warn(chalk.yellow(`⚠ ${warning}`));
+      }
+    }
   }
-
-  const { css, components } = buildComponents(scanResult.occurrences, {
-    sourcePath: scanResult.resolvedPath,
-    minOccurrences: options.minOccurrences ?? 3,
-    minSize: options.minSize,
-    maxSize: options.maxSize,
-    topLimit: options.top,
-    prefix: options.prefix,
-    names: options.names,
-  });
 
   const outputPath = path.resolve(options.output);
   await fs.mkdir(path.dirname(outputPath), { recursive: true });
   await fs.writeFile(outputPath, css, 'utf-8');
+
+  const result: GenerateResult = {
+    outputPath,
+    componentsGenerated: components.length,
+    components,
+    report: scanResult?.report ?? null,
+  };
+
+  if (options.format === 'json') {
+    printGenerateJsonReport({
+      command: 'generate',
+      outputPath,
+      componentsGenerated: components.length,
+      components,
+      cssWritten: true,
+    });
+    return result;
+  }
 
   console.log('');
   console.log(chalk.bold.green('✅ CSS generated successfully'));
@@ -86,10 +150,5 @@ export async function generateCommand(
   }
 
   console.log('');
-
-  return {
-    outputPath,
-    componentsGenerated: components.length,
-    report: scanResult.report,
-  };
+  return result;
 }

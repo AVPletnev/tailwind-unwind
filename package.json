@@ -1,6 +1,6 @@
 {
   "name": "tailwind-unwind",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Analyze Tailwind CSS class usage patterns in React/Next.js projects",
   "type": "module",
   "main": "./dist/index.js",
@@ -44,6 +44,14 @@
   "engines": {
     "node": ">=18"
   },
+  "peerDependencies": {
+    "prettier": ">=3.0.0"
+  },
+  "peerDependenciesMeta": {
+    "prettier": {
+      "optional": true
+    }
+  },
   "dependencies": {
     "@babel/generator": "^7.27.0",
     "@babel/parser": "^7.27.0",
@@ -60,6 +68,7 @@
     "@types/node": "^22.15.3",
     "tsup": "^8.4.0",
     "typescript": "^5.8.3",
+    "prettier": "^3.5.3",
     "vitest": "^3.1.2"
   }
 }
