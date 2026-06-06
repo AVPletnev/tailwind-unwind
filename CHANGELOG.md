@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.6.0
+
+### Added
+- NavLink-style `className` functions — shared classes in ternary branches are counted and replaced (remainder stays per branch)
+- Block-bodied arrow `className` functions (`() => { return ... }`)
+- Terminal spinner on all commands (`--no-progress` to disable; auto-off in CI / `--format json`)
+- Expanded `test-project` with buttons, badges, nav links, `cn` panels, and other demo patterns
+
+### Changed
+- Removed default `maxSize` limit (was 5) — long duplicate class strings are now eligible for extraction
+- `generate` / `apply` with `extractableOnly` use the full extractable scan (`extractableCombinations`), not only patterns in the analyze top list
+
+### Fixed
+- `check` preview and `generate` no longer return 0 components when extractable duplicates exist but do not appear in analyze subset rankings
+
 ## 0.5.0
 
 ### Added

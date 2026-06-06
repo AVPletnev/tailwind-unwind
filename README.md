@@ -51,6 +51,14 @@ npx tailwind-unwind apply             # write changes
 
 Override defaults with flags (`./src`, `--output src/styles/components.css`) or `tailwind-unwind.config.json`.
 
+Try the built-in demo in this repo:
+
+```bash
+npx tailwind-unwind check ./test-project
+npx tailwind-unwind generate ./test-project --output test-project/styles.css
+npx tailwind-unwind apply ./test-project --output test-project/styles.css --dry-run
+```
+
 Install globally (optional):
 
 ```bash
@@ -67,9 +75,19 @@ npm install -g tailwind-unwind
 | `apply` | Does what `generate` does **and** rewrites matching `className` in source files. |
 | `init` | Generates `tailwind-unwind.config.json` from your project scan. |
 
-**Important:** `analyze` looks for frequent patterns (including subsets) with `--min-occurrences 5` by default. `check`, `generate`, and `apply` extract **exact duplicate** class strings with `--min-occurrences 3`.
+### `analyze` vs `generate` / `apply`
 
-In the analyze report, look for `Extractable: yes` — those patterns can be passed to `generate` / `apply`.
+These commands use **different** matching strategies and default thresholds:
+
+| | `analyze` | `generate` / `apply` / `check` |
+|--|-----------|--------------------------------|
+| Goal | Hints — frequent class **subsets** | Action — **exact duplicate** class strings |
+| Default `--min-occurrences` | 5 | 3 |
+| Typical output | `"flex p-4"` subset — 12×, subset only | `twu-page-header` from 8 identical full strings |
+
+`analyze` helps you explore; `generate` / `apply` only extract patterns where the **entire** `className` string matches byte-for-byte (after class-order normalization).
+
+With `extractableOnly` (default in config), `generate` / `apply` use the full extractable scan — not limited to the analyze top list.
 
 ### `check` — recommended entry point
 
@@ -77,7 +95,9 @@ In the analyze report, look for `Extractable: yes` — those patterns can be pas
 npx tailwind-unwind check
 ```
 
-All commands show a terminal spinner with progress in interactive mode (e.g. `Scanning source files... 42/180`, `Applying replacements... 10/42`). Disabled in CI, with `--format json`, or `--no-progress`.
+Shows extractable pattern count, top matches, and a dry-run apply preview (files to change, replacement count).
+
+All commands show a terminal spinner in interactive mode (e.g. `Scanning source files... 42/180`). Disabled in CI, with `--format json`, or `--no-progress`.
 
 For CI — fail when duplicates exceed a threshold:
 
@@ -98,7 +118,8 @@ npx tailwind-unwind check
 # Detailed report (optional)
 npx tailwind-unwind analyze --format json > report.json
 
-# Generate only extractable patterns from the report
+# Generate CSS (from scan or saved report)
+npx tailwind-unwind generate
 npx tailwind-unwind generate --from-report report.json
 
 # Preview replacements, then apply
@@ -118,13 +139,35 @@ Also supported: `.tailwind-unwindrc`, `tailwind-unwind.config.ts` / `.js`.
 
 Example — see [`tailwind-unwind.config.example.json`](tailwind-unwind.config.example.json).
 
+```json
+{
+  "names": {
+    "flex items-center justify-between p-4": "page-header"
+  },
+  "analyze": { "minOccurrences": 5, "top": 10 },
+  "generate": { "minOccurrences": 3, "prefix": "twu-", "output": "styles.css", "extractableOnly": true },
+  "apply": { "minOccurrences": 3, "prettier": true }
+}
+```
+
 Key options:
 
 - `include` / `exclude` — which files to scan
 - `names` — map utilities to your class names (`"flex p-4"` → `"toolbar"`)
-- `analyze` / `generate` / `apply` — per-command settings
+- `analyze` / `generate` / `apply` — per-command settings (`minOccurrences`, `top`, `output`, …)
 
 CLI flags override config values.
+
+### `--min-occurrences`
+
+Minimum repeat count before a pattern is considered:
+
+- **`analyze`** — show in the frequent-combinations report (subset search). Default **5**.
+- **`generate` / `apply`** — create a component class from exact duplicates. Default **3**.
+
+Lower the value to catch rarer duplicates: `--min-occurrences 2`.
+
+There is **no default `maxSize` limit** — long class strings (10+ utilities) are extracted when duplicated. Use `--max-size <n>` only if you want to cap combination length.
 
 ## What `apply` can replace
 
@@ -167,7 +210,9 @@ Override with `--prefix app-` or the `names` field in config.
 | `--format json` | analyze, check, generate, apply | Output for CI / scripts |
 | `--changed [ref]` | all | Only git-changed files |
 | `--from-report <file>` | generate, apply | Use analyze JSON output |
-| `--extractable-only` | generate, apply | Only patterns marked extractable |
+| `--extractable-only` | generate, apply | Only exact duplicates (default via config) |
+| `--min-occurrences <n>` | all | Repeat threshold (see above) |
+| `--max-size <n>` | all | Optional cap on classes per combination |
 | `--config <file>` | all | Custom config path |
 | `--include` / `--exclude` | all | Filter files by glob |
 
@@ -178,6 +223,7 @@ Override with `--prefix app-` or the `names` field in config.
 | scan path | `.` (project root) | `.` |
 | `--output` | — | `styles.css` |
 | `--min-occurrences` | 5 | 3 |
+| `--max-size` | — (no limit) | — (no limit) |
 | `--prefix` | — | `twu-` |
 
 Config file values override CLI defaults; explicit flags override config.
@@ -209,7 +255,7 @@ npx tailwind-unwind check --fail-on-extractable 0 --format json
 GitHub Actions composite action — see [`action.yml`](action.yml):
 
 ```yaml
-- uses: AVPletnev/tailwind-unwind@v0.5.0
+- uses: AVPletnev/tailwind-unwind@v0.6.0
   with:
     command: check
     format: json
@@ -223,7 +269,7 @@ git clone https://github.com/AVPletnev/tailwind-unwind.git
 cd tailwind-unwind && npm install && npm run build && npm test
 ```
 
-CI in this repo also runs `check` against `test-project` as a smoke test.
+CI in this repo also runs `check` against `test-project` as a smoke test. The `test-project/` folder is a self-contained demo; `test/fixtures/` holds minimal parser unit-test samples.
 
 ## License
 

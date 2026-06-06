@@ -8,7 +8,6 @@ import { dedupeSubsetCombinations } from './dedupe.js';
 import { generateCombinations, normalizeClasses } from './combiner.js';
 
 const DEFAULT_MIN_COMBINATION_SIZE = 2;
-const DEFAULT_MAX_COMBINATION_SIZE = 5;
 const DEFAULT_MIN_OCCURRENCES = 5;
 const DEFAULT_TOP_LIMIT = 10;
 
@@ -40,7 +39,7 @@ export function findFrequentPatterns(
 ): ClassCombination[] {
   const minOccurrences = options.minOccurrences ?? DEFAULT_MIN_OCCURRENCES;
   const minSize = options.minSize ?? DEFAULT_MIN_COMBINATION_SIZE;
-  const maxSize = options.maxSize ?? DEFAULT_MAX_COMBINATION_SIZE;
+  const maxSize = options.maxSize;
   const topLimit = options.topLimit ?? DEFAULT_TOP_LIMIT;
   const dedupeSubsets = options.dedupeSubsets ?? true;
 
@@ -58,7 +57,10 @@ export function findFrequentPatterns(
       line: occurrence.line,
     };
 
-    const cappedMaxSize = Math.min(maxSize, uniqueInElement.length);
+    const cappedMaxSize =
+      maxSize === undefined
+        ? uniqueInElement.length
+        : Math.min(maxSize, uniqueInElement.length);
 
     for (let size = minSize; size <= cappedMaxSize; size += 1) {
       const combos = generateCombinations(uniqueInElement, size);
@@ -117,7 +119,7 @@ export function findRepeatedClassSets(
 ): ClassCombination[] {
   const minOccurrences = options.minOccurrences ?? 3;
   const minSize = options.minSize ?? 2;
-  const maxSize = options.maxSize ?? DEFAULT_MAX_COMBINATION_SIZE;
+  const maxSize = options.maxSize;
   const topLimit = options.topLimit ?? DEFAULT_TOP_LIMIT;
 
   const frequency = new Map<string, FrequencyEntry>();
@@ -125,7 +127,10 @@ export function findRepeatedClassSets(
   for (const occurrence of occurrences) {
     const uniqueInElement = [...new Set(occurrence.classes)];
 
-    if (uniqueInElement.length < minSize || uniqueInElement.length > maxSize) {
+    if (
+      uniqueInElement.length < minSize ||
+      (maxSize !== undefined && uniqueInElement.length > maxSize)
+    ) {
       continue;
     }
 

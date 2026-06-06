@@ -127,7 +127,7 @@ export function withNumericDefaults(
   defaults: {
     minOccurrences: number;
     minSize: number;
-    maxSize: number;
+    maxSize?: number;
     top: number;
     prefix?: string;
   },
@@ -138,7 +138,10 @@ export function withNumericDefaults(
       resolved.minOccurrences ??
       cliNumber(opts.minOccurrences, defaults.minOccurrences),
     minSize: resolved.minSize ?? cliNumber(opts.minSize, defaults.minSize),
-    maxSize: resolved.maxSize ?? cliNumber(opts.maxSize, defaults.maxSize),
+    maxSize:
+      resolved.maxSize ??
+      optionalNumber(opts.maxSize) ??
+      defaults.maxSize,
     top: resolved.top ?? cliNumber(opts.top, defaults.top),
     prefix: resolved.prefix ?? opts.prefix ?? defaults.prefix,
   };
