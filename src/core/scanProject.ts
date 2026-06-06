@@ -10,6 +10,7 @@ import { normalizeClasses } from '../analyzer/combiner.js';
 import { parseFile } from '../parser/jsxParser.js';
 import type {
   AnalysisReport,
+  ClassCombination,
   ClassNameOccurrence,
 } from '../parser/types.js';
 import { getChangedFilesInScope } from '../scanner/gitChanged.js';
@@ -40,6 +41,7 @@ export interface ScanProjectResult {
   occurrences: ClassNameOccurrence[];
   warnings: string[];
   report: AnalysisReport;
+  extractableCombinations: ClassCombination[];
 }
 
 /**
@@ -106,8 +108,11 @@ export async function scanProject(
     dedupeSubsets: options.dedupeSubsets,
   });
 
+  const analyzeMinOccurrences = options.minOccurrences ?? 5;
+  const extractableMinOccurrences = options.extractableMinOccurrences ?? 3;
+
   const extractableSets = findRepeatedClassSets(occurrences, {
-    minOccurrences: options.extractableMinOccurrences ?? 3,
+    minOccurrences: extractableMinOccurrences,
     minSize: options.minSize,
     maxSize: options.maxSize,
     topLimit: Number.POSITIVE_INFINITY,
@@ -138,6 +143,9 @@ export async function scanProject(
       ),
       topCombinations,
       potentialReductionPercent,
+      extractablePatternCount: extractableSets.length,
+      analyzeMinOccurrences,
+      extractableMinOccurrences,
     },
     parseWarnings: warnings,
   };
@@ -148,5 +156,6 @@ export async function scanProject(
     occurrences,
     warnings,
     report,
+    extractableCombinations: extractableSets,
   };
 }

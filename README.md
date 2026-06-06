@@ -35,17 +35,21 @@ And generates the CSS for you:
 
 ## Quick start
 
+Run from your project root — no paths required (defaults: scan `.`, CSS output `styles.css`):
+
 ```bash
-# 1. See what repeats
-npx tailwind-unwind analyze ./src
+# 1. Quick check — extractable duplicates + apply preview
+npx tailwind-unwind check
 
 # 2. Generate CSS
-npx tailwind-unwind generate ./src --output styles.css
+npx tailwind-unwind generate
 
 # 3. Import styles.css in globals.css, then replace in source files
-npx tailwind-unwind apply ./src --output styles.css --dry-run   # preview first
-npx tailwind-unwind apply ./src --output styles.css             # write changes
+npx tailwind-unwind apply --dry-run   # preview first
+npx tailwind-unwind apply             # write changes
 ```
+
+Override defaults with flags (`./src`, `--output src/styles/components.css`) or `tailwind-unwind.config.json`.
 
 Install globally (optional):
 
@@ -53,33 +57,53 @@ Install globally (optional):
 npm install -g tailwind-unwind
 ```
 
-## How the three commands differ
+## Commands
 
 | Command | What it does |
 |---------|--------------|
-| `analyze` | Shows which class combinations repeat and where. Safe — read-only. |
+| `check` | One-shot health check: extractable duplicates + apply dry-run preview. **Start here.** |
+| `analyze` | Detailed report of frequent class combinations. Safe — read-only. |
 | `generate` | Creates a CSS file with `@layer components` + `@apply`. Does not touch your `.tsx` files. |
 | `apply` | Does what `generate` does **and** rewrites matching `className` in source files. |
+| `init` | Generates `tailwind-unwind.config.json` from your project scan. |
 
-**Important:** `analyze` looks for frequent patterns (including subsets). `generate` and `apply` only work with **exact duplicate** class strings that appear multiple times.
+**Important:** `analyze` looks for frequent patterns (including subsets) with `--min-occurrences 5` by default. `check`, `generate`, and `apply` extract **exact duplicate** class strings with `--min-occurrences 3`.
 
 In the analyze report, look for `Extractable: yes` — those patterns can be passed to `generate` / `apply`.
+
+### `check` — recommended entry point
+
+```bash
+npx tailwind-unwind check
+```
+
+Shows how many patterns are ready to extract and previews what `apply` would change (without writing files).
+
+For CI — fail when duplicates exceed a threshold:
+
+```bash
+npx tailwind-unwind check --fail-on-extractable 0   # fail if any extractable pattern exists
+npx tailwind-unwind check --format json
+```
 
 ## Typical workflow
 
 ```bash
 # Optional: create config from your project
-npx tailwind-unwind init ./src
+npx tailwind-unwind init
 
-# Analyze → save report
-npx tailwind-unwind analyze ./src --format json > report.json
+# Quick overview + dry-run preview
+npx tailwind-unwind check
+
+# Detailed report (optional)
+npx tailwind-unwind analyze --format json > report.json
 
 # Generate only extractable patterns from the report
-npx tailwind-unwind generate --from-report report.json --output src/styles/components.css
+npx tailwind-unwind generate --from-report report.json
 
 # Preview replacements, then apply
-npx tailwind-unwind apply ./src --output src/styles/components.css --dry-run
-npx tailwind-unwind apply ./src --output src/styles/components.css --prettier
+npx tailwind-unwind apply --dry-run
+npx tailwind-unwind apply --prettier
 ```
 
 ## Configuration
@@ -87,7 +111,7 @@ npx tailwind-unwind apply ./src --output src/styles/components.css --prettier
 Create `tailwind-unwind.config.json` manually or run `init`:
 
 ```bash
-npx tailwind-unwind init ./src
+npx tailwind-unwind init
 ```
 
 Also supported: `.tailwind-unwindrc`, `tailwind-unwind.config.ts` / `.js`.
@@ -116,6 +140,8 @@ CLI flags override config values.
 Parsed: `cn`, `clsx`, `classnames`, `twMerge`, `cva`, `tv`, template literals.  
 Class order does not matter (`flex p-4` = `p-4 flex`).
 
+Skipped locations are grouped by reason in the console; use `--verbose-skipped` for the full list.
+
 ## Generated class names
 
 Default prefix is `twu-` to avoid clashes with your existing styles:
@@ -131,9 +157,11 @@ Override with `--prefix app-` or the `names` field in config.
 
 | Flag | Commands | Purpose |
 |------|----------|---------|
+| `--fail-on-extractable <n>` | check | Exit 1 when extractable patterns exceed `n` |
+| `--verbose-skipped` | apply, check | List every skipped replacement (default: grouped summary) |
 | `--dry-run` | apply | Preview without writing files |
 | `--prettier` | apply | Format changed files with Prettier |
-| `--format json` | analyze, generate, apply | Output for CI / scripts |
+| `--format json` | analyze, check, generate, apply | Output for CI / scripts |
 | `--changed [ref]` | all | Only git-changed files |
 | `--from-report <file>` | generate, apply | Use analyze JSON output |
 | `--extractable-only` | generate, apply | Only patterns marked extractable |
@@ -142,24 +170,48 @@ Override with `--prefix app-` or the `names` field in config.
 
 ### Defaults
 
-| | analyze | generate / apply |
-|--|---------|------------------|
+| | analyze | check / generate / apply |
+|--|---------|--------------------------|
+| scan path | `.` (project root) | `.` |
+| `--output` | — | `styles.css` |
 | `--min-occurrences` | 5 | 3 |
 | `--prefix` | — | `twu-` |
+
+Config file values override CLI defaults; explicit flags override config.
 
 ## Programmatic API
 
 ```typescript
-import { analyzeCommand, generateCommand, applyCommand, buildComponents } from 'tailwind-unwind';
+import {
+  checkCommand,
+  analyzeCommand,
+  generateCommand,
+  applyCommand,
+} from 'tailwind-unwind';
 
-await analyzeCommand('./src', { format: 'json' });
+await checkCommand('.', { output: 'styles.css' });
+await analyzeCommand('.', { format: 'json', extractableMinOccurrences: 3 });
 ```
 
 Full exports: `walkSourceFiles`, `parseFile`, `findRepeatedClassSets`, `buildComponents`, `loadCommandOptions`, and more.
 
 ## CI
 
-For GitHub Actions, use the composite action in [`action.yml`](action.yml) (`command`, `path`, `format`, `args`).
+In your app repo — gate PRs on duplicate Tailwind patterns:
+
+```bash
+npx tailwind-unwind check --fail-on-extractable 0 --format json
+```
+
+GitHub Actions composite action — see [`action.yml`](action.yml):
+
+```yaml
+- uses: AVPletnev/tailwind-unwind@v0.5.0
+  with:
+    command: check
+    format: json
+    args: --fail-on-extractable 0
+```
 
 ## Development
 
@@ -167,6 +219,8 @@ For GitHub Actions, use the composite action in [`action.yml`](action.yml) (`com
 git clone https://github.com/AVPletnev/tailwind-unwind.git
 cd tailwind-unwind && npm install && npm run build && npm test
 ```
+
+CI in this repo also runs `check` against `test-project` as a smoke test.
 
 ## License
 

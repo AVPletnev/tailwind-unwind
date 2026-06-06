@@ -139,7 +139,7 @@ export async function generateCommand(
     console.log('');
     console.log(
       chalk.cyan(
-        'Run apply to replace className strings: npx tailwind-unwind apply <path> --output styles.css',
+        'Run apply to replace className strings: npx tailwind-unwind apply',
       ),
     );
   } else {

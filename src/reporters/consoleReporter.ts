@@ -93,25 +93,37 @@ export function printConsoleReport(
       `💡 Potential code reduction: ${stats.potentialReductionPercent}%`,
     ),
   );
-  const extractableCount = stats.topCombinations.filter(
+  const extractableInTop = stats.topCombinations.filter(
     (combo) => combo.extractable,
   ).length;
-  if (extractableCount > 0) {
+
+  if (stats.analyzeMinOccurrences !== stats.extractableMinOccurrences) {
+    console.log('');
+    console.log(
+      chalk.yellow(
+        `Note: this list uses min-occurrences ${stats.analyzeMinOccurrences}; ` +
+          `generate/apply extract exact duplicates with ≥${stats.extractableMinOccurrences}.`,
+      ),
+    );
+    if (stats.extractablePatternCount > extractableInTop) {
+      console.log(
+        chalk.yellow(
+          `      ${stats.extractablePatternCount} extractable pattern(s) total in project.`,
+        ),
+      );
+    }
+  } else if (stats.extractablePatternCount > 0) {
     console.log(
       chalk.magenta(
-        `💡 ${extractableCount} pattern(s) ready for generate/apply`,
+        `💡 ${stats.extractablePatternCount} extractable pattern(s) ready for generate/apply`,
       ),
     );
   }
+
   console.log(
-    chalk.magenta(
-      '💡 Generate CSS: npx tailwind-unwind generate <path> --output styles.css',
-    ),
+    chalk.magenta('💡 Quick check: npx tailwind-unwind check'),
   );
-  console.log(
-    chalk.magenta(
-      '💡 Apply classes: npx tailwind-unwind apply <path> --output styles.css',
-    ),
-  );
+  console.log(chalk.magenta('💡 Generate CSS: npx tailwind-unwind generate'));
+  console.log(chalk.magenta('💡 Apply classes: npx tailwind-unwind apply'));
   console.log('');
 }

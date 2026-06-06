@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.5.0
+
+### Added
+- `check` command — extractable duplicates + apply dry-run preview in one step
+- `--fail-on-extractable <n>` for CI gates
+- `--verbose-skipped` on `apply` and `check`
+- Default scan path `.` and CSS output `styles.css` when flags are omitted
+- `extractablePatternCount` and threshold metadata in analyze JSON
+
+### Changed
+- `analyze` marks extractable patterns using generate `min-occurrences` (default 3)
+- Skipped replacements grouped by reason in console output (compact by default)
+- README and `init` next steps centered on `check`
+
+### Removed
+- `tailwind-unwind.config.example.ts` (duplicate of JSON example)
+- `.github/workflows/tailwind-unwind-example.yml` (broken/redundant demo workflow)
+
 ## 0.4.0
 
 ### Added

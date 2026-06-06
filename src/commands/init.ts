@@ -121,16 +121,8 @@ export async function initCommand(
   );
   console.log('');
   console.log(chalk.cyan('Next steps:'));
-  console.log(
-    chalk.white(
-      `  npx tailwind-unwind analyze ${targetPath} --config ${path.basename(outputPath)}`,
-    ),
-  );
-  console.log(
-    chalk.white(
-      `  npx tailwind-unwind generate ${targetPath} --config ${path.basename(outputPath)}`,
-    ),
-  );
+  console.log(chalk.white('  npx tailwind-unwind check'));
+  console.log(chalk.white('  npx tailwind-unwind generate'));
   console.log('');
 
   return {

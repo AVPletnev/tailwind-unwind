@@ -24,7 +24,7 @@ export async function analyzeCommand(
       include: options.include,
       exclude: options.exclude,
       changed: options.changed,
-      extractableMinOccurrences: 3,
+      extractableMinOccurrences: options.extractableMinOccurrences,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

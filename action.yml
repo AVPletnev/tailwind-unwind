@@ -5,7 +5,7 @@ branding:
   color: blue
 inputs:
   command:
-    description: Command to run (analyze, generate, apply, init)
+    description: Command to run (analyze, check, generate, apply, init)
     required: true
     default: analyze
   path:
@@ -15,7 +15,7 @@ inputs:
   output:
     description: CSS output path for generate/apply
     required: false
-    default: styles/components.css
+    default: styles.css
   format:
     description: Output format (console or json)
     required: false

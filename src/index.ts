@@ -9,6 +9,7 @@ export type {
 } from './config/types.js';
 export { initCommand } from './commands/init.js';
 export { analyzeCommand } from './commands/analyze.js';
+export { checkCommand } from './commands/check.js';
 export { calculateSavings } from './analyzer/savings.js';
 export {
   getChangedFilesInScope,
@@ -72,6 +73,14 @@ export { parseFile, parseSource } from './parser/jsxParser.js';
 export { walkSourceFiles } from './scanner/fileWalker.js';
 export { printConsoleReport } from './reporters/consoleReporter.js';
 export { printJsonReport } from './reporters/jsonReporter.js';
+export {
+  printCheckConsoleReport,
+  printCheckJsonReport,
+} from './reporters/checkReporter.js';
+export {
+  groupSkippedByReason,
+  printSkippedReport,
+} from './reporters/skippedReporter.js';
 export { IGNORED_DIRECTORIES, IGNORE_PATTERNS } from './scanner/ignore.js';
 export type {
   AnalysisReport,

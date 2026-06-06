@@ -21,3 +21,6 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm test
+
+      - name: Smoke test check on test-project
+        run: node bin/index.js check ./test-project --format json --min-occurrences 2

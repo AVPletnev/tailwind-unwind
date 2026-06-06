@@ -15,10 +15,14 @@ import {
   printApplyJsonReport,
   type ApplyJsonReport,
 } from '../reporters/operationJsonReporter.js';
+import { printSkippedReport } from '../reporters/skippedReporter.js';
 
 export interface ApplyOptions extends AnalyzeOptions {
   output: string;
   dryRun?: boolean;
+  verboseSkipped?: boolean;
+  /** Suppress console/json output (for internal callers like check) */
+  quiet?: boolean;
 }
 
 export interface ApplyResult {
@@ -57,7 +61,7 @@ export async function applyCommand(
   }
 
   for (const warning of scanResult.warnings) {
-    if (options.format !== 'json') {
+    if (!options.quiet && options.format !== 'json') {
       console.warn(chalk.yellow(`⚠ ${warning}`));
     }
   }
@@ -112,12 +116,26 @@ export async function applyCommand(
   }
 
   if (components.length === 0) {
-    console.error(
-      chalk.yellow(
-        'No repeated className sets found. Try lowering --min-occurrences.',
-      ),
-    );
-    process.exit(1);
+    if (!options.quiet) {
+      console.error(
+        chalk.yellow(
+          'No repeated className sets found. Try lowering --min-occurrences.',
+        ),
+      );
+      process.exit(1);
+    }
+
+    return {
+      filesModified: 0,
+      replacementsTotal: 0,
+      outputPath: path.resolve(options.output),
+      componentsGenerated: 0,
+      components: [],
+      replacements: [],
+      skipped: [],
+      prettierFormatted: [],
+      savings: calculateSavings([]),
+    };
   }
 
   const outputPath = path.resolve(options.output);
@@ -184,7 +202,7 @@ export async function applyCommand(
     savings,
   };
 
-  if (options.format === 'json') {
+  if (options.format === 'json' && !options.quiet) {
     printApplyJsonReport({
       command: 'apply',
       dryRun: Boolean(options.dryRun),
@@ -197,6 +215,10 @@ export async function applyCommand(
       skipped: allSkipped,
       savings,
     });
+    return result;
+  }
+
+  if (options.quiet) {
     return result;
   }
 
@@ -261,19 +283,7 @@ export async function applyCommand(
     }
   }
 
-  if (allSkipped.length > 0) {
-    console.log('');
-    console.log(chalk.bold.yellow(`Skipped (${allSkipped.length}):`));
-    for (const item of allSkipped) {
-      const line = item.line ? `:${item.line}` : '';
-      const classes = item.classes.join(' ');
-      console.log(
-        chalk.gray(`  ${item.filePath}${line}`) +
-          chalk.yellow(` [${item.reason}]`) +
-          chalk.dim(` "${classes}"`),
-      );
-    }
-  }
+  printSkippedReport(allSkipped, { verbose: options.verboseSkipped });
 
   console.log('');
   if (!options.dryRun) {

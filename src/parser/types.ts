@@ -38,6 +38,12 @@ export interface AnalysisStats {
   totalClassUsages: number;
   topCombinations: ClassCombination[];
   potentialReductionPercent: number;
+  /** Exact duplicates eligible for generate/apply (not limited by --top) */
+  extractablePatternCount: number;
+  /** analyze min-occurrences used for the frequent-pattern list */
+  analyzeMinOccurrences: number;
+  /** threshold used to mark patterns as extractable */
+  extractableMinOccurrences: number;
 }
 
 export interface AnalysisReport {
@@ -48,6 +54,8 @@ export interface AnalysisReport {
 
 export interface AnalyzeOptions {
   minOccurrences?: number;
+  /** Threshold for marking patterns as extractable (defaults to generate min-occurrences) */
+  extractableMinOccurrences?: number;
   minSize?: number;
   maxSize?: number;
   top?: number;
