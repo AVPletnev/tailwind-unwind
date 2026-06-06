@@ -85,6 +85,8 @@ export function findFrequentPatterns(
     }
   }
 
+  const preDedupeCap = Math.max(topLimit * 20, 100);
+
   let frequent = [...frequency.entries()]
     .filter(([, value]) => value.count > minOccurrences)
     .map(([normalized, value]) => ({
@@ -99,7 +101,8 @@ export function findFrequentPatterns(
         return b.occurrences - a.occurrences;
       }
       return b.classes.length - a.classes.length;
-    });
+    })
+    .slice(0, preDedupeCap);
 
   if (dedupeSubsets) {
     frequent = dedupeSubsetCombinations(frequent);

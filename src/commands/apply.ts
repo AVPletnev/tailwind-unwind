@@ -28,6 +28,8 @@ export interface ApplyOptions extends AnalyzeOptions {
   verboseSkipped?: boolean;
   /** Suppress console/json output (for internal callers like check) */
   quiet?: boolean;
+  /** Show per-file progress during replacement (used by check preview) */
+  showReplacementProgress?: boolean;
 }
 
 export interface ApplyResult {
@@ -51,10 +53,14 @@ export async function applyCommand(
 ): Promise<ApplyResult> {
   let scanResult: Awaited<ReturnType<typeof scanProject>>;
   const showProgress = shouldShowProgress(options);
-  const useOwnSpinner = showProgress && !options.quiet;
+  const useOwnSpinner = showProgress && !options.quiet && !options.scanResult;
+  const showReplacementSpinner =
+    (showProgress && !options.quiet) || Boolean(options.showReplacementProgress);
 
   try {
-    if (useOwnSpinner) {
+    if (options.scanResult) {
+      scanResult = options.scanResult;
+    } else if (useOwnSpinner) {
       scanResult = await scanProjectWithSpinner(
         {
           targetPath,
@@ -62,8 +68,9 @@ export async function applyCommand(
           exclude: options.exclude,
           changed: options.changed,
           extractableMinOccurrences: options.minOccurrences ?? 3,
+          skipSubsetAnalysis: true,
         },
-        { showProgress: true },
+        { showProgress: true, label: 'Scanning project' },
       );
     } else {
       scanResult = await scanProject({
@@ -72,6 +79,7 @@ export async function applyCommand(
         exclude: options.exclude,
         changed: options.changed,
         extractableMinOccurrences: options.minOccurrences ?? 3,
+        skipSubsetAnalysis: options.quiet ? true : undefined,
         onParseProgress: options.onParseProgress,
       });
     }
@@ -181,7 +189,7 @@ export async function applyCommand(
     ? 'Previewing replacements'
     : 'Applying replacements';
 
-  await runWithSpinner(useOwnSpinner, replacementLabel, async (update) => {
+  await runWithSpinner(showReplacementSpinner, replacementLabel, async (update) => {
     const files = scanResult.files;
 
     for (let index = 0; index < files.length; index += 1) {

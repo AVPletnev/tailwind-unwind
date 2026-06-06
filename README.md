@@ -258,7 +258,7 @@ npx tailwind-unwind check --fail-on-extractable 0 --format json
 GitHub Actions composite action — see [`action.yml`](action.yml):
 
 ```yaml
-- uses: AVPletnev/tailwind-unwind@v0.6.1
+- uses: AVPletnev/tailwind-unwind@v0.6.2
   with:
     command: check
     format: json

@@ -73,8 +73,9 @@ export async function generateCommand(
           exclude: options.exclude,
           changed: options.changed,
           extractableMinOccurrences: options.minOccurrences ?? 3,
+          skipSubsetAnalysis: true,
         },
-        { showProgress },
+        { showProgress, label: 'Scanning project' },
       );
 
       const built = await runWithSpinner(

@@ -1,6 +1,6 @@
 {
   "name": "tailwind-unwind",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Analyze Tailwind CSS class usage patterns in React/Next.js projects",
   "type": "module",
   "main": "./dist/index.js",

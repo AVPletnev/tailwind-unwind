@@ -1,7 +1,6 @@
 import chalk from 'chalk';
 import { GENERATE_DEFAULTS } from '../cli/defaults.js';
 import {
-  createScanProgressHandler,
   createSpinner,
   scanProjectWithSpinner,
   shouldShowProgress,
@@ -51,8 +50,9 @@ export async function checkCommand(
         exclude: options.exclude,
         changed: options.changed,
         extractableMinOccurrences: options.extractableMinOccurrences,
+        skipSubsetAnalysis: true,
       },
-      { showProgress },
+      { showProgress, label: 'Scanning project' },
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -97,10 +97,9 @@ export async function checkCommand(
         extractableOnly: true,
         dryRun: true,
         quiet: true,
+        scanResult,
+        showReplacementProgress: showProgress,
         verboseSkipped: options.verboseSkipped,
-        onParseProgress: showProgress
-          ? createScanProgressHandler(previewSpinner, 'Previewing replacements')
-          : options.onParseProgress,
       });
       previewSpinner.stop();
     } catch (error) {

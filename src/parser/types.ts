@@ -56,6 +56,8 @@ export interface AnalyzeOptions {
   minOccurrences?: number;
   /** Threshold for marking patterns as extractable (defaults to generate min-occurrences) */
   extractableMinOccurrences?: number;
+  /** Reuse a prior scan (e.g. check → apply preview) to avoid scanning twice */
+  scanResult?: import('../core/scanProject.js').ScanProjectResult;
   minSize?: number;
   maxSize?: number;
   top?: number;

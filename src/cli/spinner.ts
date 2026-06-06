@@ -41,8 +41,9 @@ export function createSpinner(options: SpinnerOptions = {}): Spinner {
       return;
     }
 
+    clearLine();
     const frameChar = FRAMES[frame % FRAMES.length];
-    stream.write(`\r${frameChar} ${message}`);
+    stream.write(`${frameChar} ${message}`);
     frame += 1;
   }
 

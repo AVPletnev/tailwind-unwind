@@ -119,14 +119,16 @@ export async function scanProject(
     ),
   );
 
-  options.onParseProgress?.({
-    current: files.length,
-    total: files.length,
-    filePath: '',
-  });
-
   const analyzeMinOccurrences = options.minOccurrences ?? 5;
   const extractableMinOccurrences = options.extractableMinOccurrences ?? 3;
+
+  if (!options.skipSubsetAnalysis) {
+    options.onParseProgress?.({
+      current: files.length,
+      total: files.length,
+      filePath: '',
+    });
+  }
 
   const extractableSets = findRepeatedClassSets(occurrences, {
     minOccurrences: extractableMinOccurrences,

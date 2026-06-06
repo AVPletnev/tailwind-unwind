@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.2
+
+### Fixed
+- `check` no longer runs subset analysis or a second full project scan for the apply preview
+- `generate` / `apply` skip subset analysis (only exact duplicates are needed)
+- Subset dedupe in `analyze` caps candidates before O(n²) dedupe — large repos finish in seconds
+
+### Changed
+- `check` spinner phases: `Scanning project` → `Computing patterns` (only when subset analysis runs)
+
 ## 0.6.1
 
 ### Fixed
