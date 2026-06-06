@@ -157,17 +157,9 @@ await analyzeCommand('./src', { format: 'json' });
 
 Full exports: `walkSourceFiles`, `parseFile`, `findRepeatedClassSets`, `buildComponents`, `loadCommandOptions`, and more.
 
-## GitHub Action
+## CI
 
-```yaml
-- uses: AVPletnev/tailwind-unwind@v0.4.0
-  with:
-    command: analyze
-    path: ./src
-    format: json
-```
-
-See [`action.yml`](action.yml) for inputs.
+For GitHub Actions, use the composite action in [`action.yml`](action.yml) (`command`, `path`, `format`, `args`).
 
 ## Development
 
