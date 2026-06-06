@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.1
+
+### Fixed
+- `init` / `analyze` no longer appear to hang after the last file on large projects — subset analysis defaults to `maxSize: 5` again
+- Spinner shows `Computing patterns...` after file parsing completes
+- `init` skips expensive subset search and builds `names` from extractable exact duplicates
+
 ## 0.6.0
 
 ### Added

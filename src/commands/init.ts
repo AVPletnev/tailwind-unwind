@@ -37,9 +37,7 @@ function buildConfigFromScan(
   targetPath: string,
   options: InitOptions,
 ): TailwindUnwindConfigFile {
-  const extractable = scanResult.report.stats.topCombinations.filter(
-    (combo) => combo.extractable,
-  );
+  const extractable = scanResult.extractableCombinations;
 
   const names: Record<string, string> = {};
   for (const combo of extractable.slice(0, options.top ?? 10)) {
@@ -102,6 +100,7 @@ export async function initCommand(
       include: options.include,
       exclude: options.exclude,
       extractableMinOccurrences: 3,
+      skipSubsetAnalysis: true,
     },
     {
       label: 'Analyzing project',
@@ -115,9 +114,7 @@ export async function initCommand(
   await fs.mkdir(path.dirname(outputPath), { recursive: true });
   await fs.writeFile(outputPath, json, 'utf-8');
 
-  const extractableCount = scanResult.report.stats.topCombinations.filter(
-    (combo) => combo.extractable,
-  ).length;
+  const extractableCount = scanResult.extractableCombinations.length;
 
   console.log('');
   console.log(chalk.bold.green('✅ Config created'));

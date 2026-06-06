@@ -39,6 +39,11 @@ export interface ScanProjectOptions extends PatternFinderOptions {
   extractableMinOccurrences?: number;
   /** Scan only git-changed files; string value is the git ref to diff against */
   changed?: boolean | string;
+  /**
+   * Skip combinatorial subset search (analyze hints). Faster for `init` on large repos.
+   * `topCombinations` will list extractable exact duplicates instead.
+   */
+  skipSubsetAnalysis?: boolean;
   onParseProgress?: (progress: ParseProgress) => void;
 }
 
@@ -114,12 +119,10 @@ export async function scanProject(
     ),
   );
 
-  const frequentCombinations = findFrequentPatterns(occurrences, {
-    minOccurrences: options.minOccurrences,
-    minSize: options.minSize,
-    maxSize: options.maxSize,
-    topLimit: options.topLimit,
-    dedupeSubsets: options.dedupeSubsets,
+  options.onParseProgress?.({
+    current: files.length,
+    total: files.length,
+    filePath: '',
   });
 
   const analyzeMinOccurrences = options.minOccurrences ?? 5;
@@ -135,10 +138,24 @@ export async function scanProject(
     extractableSets.map((combo) => combo.normalized),
   );
 
-  const topCombinations = frequentCombinations.map((combo) => ({
-    ...combo,
-    extractable: extractableKeys.has(combo.normalized),
-  }));
+  const frequentCombinations = options.skipSubsetAnalysis
+    ? []
+    : findFrequentPatterns(occurrences, {
+        minOccurrences: options.minOccurrences,
+        minSize: options.minSize,
+        maxSize: options.maxSize,
+        topLimit: options.topLimit,
+        dedupeSubsets: options.dedupeSubsets,
+      });
+
+  const topCombinations = options.skipSubsetAnalysis
+    ? extractableSets
+        .slice(0, options.topLimit ?? 10)
+        .map((combo) => ({ ...combo, extractable: true }))
+    : frequentCombinations.map((combo) => ({
+        ...combo,
+        extractable: extractableKeys.has(combo.normalized),
+      }));
 
   const potentialReductionPercent = calculatePotentialReduction(
     occurrences,

@@ -1,0 +1,34 @@
+{
+  "include": [
+    "**/*.tsx",
+    "**/*.jsx"
+  ],
+  "exclude": [
+    "**/*.test.tsx",
+    "**/*.stories.tsx"
+  ],
+  "names": {
+    "flex items-center justify-between p-4": "page-header",
+    "flex no-underline px-[10px] py-[2px] text-accent text-lg text-light-text whitespace-no-wrap": "row",
+    "bg-muted flex font-medium gap-3 items-center px-3 py-2 rounded-lg text-sm": "breadcrumb"
+  },
+  "analyze": {
+    "minOccurrences": 5,
+    "top": 10,
+    "dedupeSubsets": true
+  },
+  "generate": {
+    "minOccurrences": 3,
+    "prefix": "twu-",
+    "output": "src/styles/components.css",
+    "top": 20,
+    "extractableOnly": true
+  },
+  "apply": {
+    "minOccurrences": 3,
+    "prefix": "twu-",
+    "output": "src/styles/components.css",
+    "prettier": true,
+    "extractableOnly": true
+  }
+}

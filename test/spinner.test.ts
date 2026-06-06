@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { createSpinner, isInteractiveTerminal } from '../src/cli/spinner.js';
+import {
+  createScanProgressHandler,
+  createSpinner,
+  isInteractiveTerminal,
+} from '../src/cli/spinner.js';
 
 describe('spinner', () => {
   it('disables itself when enabled option is false', () => {
@@ -38,6 +42,28 @@ describe('spinner', () => {
 
     expect(writes.some((line) => line.includes('Scanning source files'))).toBe(true);
     expect(writes.at(-1)).toBe('\r\x1b[K');
+  });
+
+  it('switches to computing patterns after the last file', () => {
+    const writes: string[] = [];
+    const stream = {
+      isTTY: true,
+      write: (chunk: string) => {
+        writes.push(chunk);
+        return true;
+      },
+    } as NodeJS.WriteStream;
+
+    const spinner = createSpinner({ enabled: true, stream });
+    spinner.start('Analyzing project');
+    const onProgress = createScanProgressHandler(spinner, 'Analyzing project');
+
+    onProgress({ current: 1, total: 2, filePath: 'a.tsx' });
+    onProgress({ current: 2, total: 2, filePath: 'b.tsx' });
+    onProgress({ current: 2, total: 2, filePath: '' });
+    spinner.stop();
+
+    expect(writes.some((line) => line.includes('Computing patterns'))).toBe(true);
   });
 
   it('treats CI environments as non-interactive', () => {

@@ -167,7 +167,10 @@ Minimum repeat count before a pattern is considered:
 
 Lower the value to catch rarer duplicates: `--min-occurrences 2`.
 
-There is **no default `maxSize` limit** — long class strings (10+ utilities) are extracted when duplicated. Use `--max-size <n>` only if you want to cap combination length.
+- **`analyze`** — default `--max-size 5` (subset search is combinatorial; keeps large repos fast)
+- **`generate` / `apply`** — no `maxSize` cap by default; full exact duplicates of any length are extracted
+
+Use `--max-size <n>` on `analyze` to widen subset hints, or on `generate` to cap extraction length.
 
 ## What `apply` can replace
 
@@ -223,7 +226,7 @@ Override with `--prefix app-` or the `names` field in config.
 | scan path | `.` (project root) | `.` |
 | `--output` | — | `styles.css` |
 | `--min-occurrences` | 5 | 3 |
-| `--max-size` | — (no limit) | — (no limit) |
+| `--max-size` | 5 | — (no limit) |
 | `--prefix` | — | `twu-` |
 
 Config file values override CLI defaults; explicit flags override config.
@@ -255,7 +258,7 @@ npx tailwind-unwind check --fail-on-extractable 0 --format json
 GitHub Actions composite action — see [`action.yml`](action.yml):
 
 ```yaml
-- uses: AVPletnev/tailwind-unwind@v0.6.0
+- uses: AVPletnev/tailwind-unwind@v0.6.1
   with:
     command: check
     format: json

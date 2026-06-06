@@ -4,6 +4,7 @@ export const DEFAULT_OUTPUT_PATH = 'styles.css' as const;
 export const ANALYZE_DEFAULTS = {
   minOccurrences: 5,
   minSize: 2,
+  maxSize: 5,
   top: 10,
 } as const;
 

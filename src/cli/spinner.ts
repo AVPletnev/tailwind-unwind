@@ -93,7 +93,19 @@ export function createScanProgressHandler(
   spinner: Spinner,
   label: string,
 ): (progress: ParseProgress) => void {
-  return ({ current, total }) => {
+  let parsingDone = false;
+
+  return ({ current, total, filePath }) => {
+    if (filePath === '' && current === total) {
+      parsingDone = true;
+      spinner.update('Computing patterns...');
+      return;
+    }
+
+    if (parsingDone) {
+      return;
+    }
+
     spinner.update(`${label}... ${current}/${total}`);
   };
 }
