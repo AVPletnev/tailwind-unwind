@@ -2,334 +2,179 @@
 
 [![npm version](https://img.shields.io/npm/v/tailwind-unwind.svg)](https://www.npmjs.com/package/tailwind-unwind)
 
-CLI tool to analyze, extract, and refactor repeated Tailwind CSS utility patterns in React and Next.js projects.
+**Find repeated Tailwind classes in your React code and turn them into reusable component classes.**
 
-**Repository:** [github.com/AVPletnev/tailwind-unwind](https://github.com/AVPletnev/tailwind-unwind)
+If you copy-paste the same `className="flex items-center p-4 ..."` across dozens of files, this tool helps you clean that up — without doing it by hand.
 
-## Features
+Works with React / Next.js projects. Node.js 18+.
 
-- **analyze** — find frequent `className` patterns with file locations
-- **generate** — create `@layer components` CSS with `@apply`
-- **apply** — auto-replace repeated class strings in `.tsx`/`.jsx` source files
-- Parses static strings, template literals, `cn()` / `clsx()` / `classnames()`
-- Human-readable class names (`twu-page-header`, `twu-media-cover`) with `twu-` namespace prefix
+## The problem it solves
 
-## Installation
-
-```bash
-npm install -g tailwind-unwind
-
-# or run without installing
-npx tailwind-unwind analyze ./src
+```tsx
+// Same utilities repeated everywhere
+<div className="flex items-center justify-between p-4">...</div>
+<div className="flex items-center justify-between p-4">...</div>
+<div className="flex items-center justify-between p-4">...</div>
 ```
 
-Requires **Node.js 18+**.
+**tailwind-unwind** finds these duplicates and can replace them with one class:
 
-## Configuration
-
-Copy [`tailwind-unwind.config.example.json`](tailwind-unwind.config.example.json) to your project root:
-
-```bash
-cp node_modules/tailwind-unwind/tailwind-unwind.config.example.json tailwind-unwind.config.json
+```tsx
+<div className="twu-page-header">...</div>
 ```
 
-Supported filenames: `tailwind-unwind.config.json`, `.tailwind-unwindrc`, `tailwind-unwind.config.js` / `.mjs` / `.cjs`.
+And generates the CSS for you:
 
-```json
-{
-  "include": ["src/**/*.tsx"],
-  "exclude": ["**/*.test.tsx", "**/*.stories.tsx"],
-  "names": {
-    "flex items-center justify-between p-4": "page-header",
-    "w-full h-auto object-cover rounded-lg": "media-cover"
-  },
-  "analyze": {
-    "minOccurrences": 5,
-    "top": 10
-  },
-  "generate": {
-    "minOccurrences": 3,
-    "prefix": "twu-",
-    "output": "src/styles/components.css"
-  },
-  "apply": {
-    "output": "src/styles/components.css"
+```css
+@layer components {
+  .twu-page-header {
+    @apply flex items-center justify-between p-4;
   }
 }
-```
-
-| Key | Description |
-|-----|-------------|
-| `include` / `exclude` | Glob patterns for file scanning |
-| `names` | Custom class names (utilities string → base name, prefix added automatically) |
-| `analyze` / `generate` / `apply` | Per-command overrides (`minOccurrences`, `top`, `prefix`, `output`, …) |
-
-Config is discovered from the current directory **and** ancestors of `<path>`. CLI flags override config values.
-
-```bash
-npx tailwind-unwind analyze ./src --config ./tailwind-unwind.config.json
-npx tailwind-unwind generate ./src --include "src/components/**/*.tsx"
 ```
 
 ## Quick start
 
 ```bash
-# 1. See what repeats in your project
+# 1. See what repeats
 npx tailwind-unwind analyze ./src
 
-# 2. Generate component CSS
+# 2. Generate CSS
 npx tailwind-unwind generate ./src --output styles.css
 
-# 3. Import styles.css in your global CSS (e.g. globals.css), then apply replacements
-npx tailwind-unwind apply ./src --output styles.css --dry-run   # preview
+# 3. Import styles.css in globals.css, then replace in source files
+npx tailwind-unwind apply ./src --output styles.css --dry-run   # preview first
 npx tailwind-unwind apply ./src --output styles.css             # write changes
 ```
 
----
-
-## Commands
-
-### `analyze`
-
-Scan a directory and report the most frequent Tailwind class combinations.
+Install globally (optional):
 
 ```bash
-npx tailwind-unwind analyze <path>
+npm install -g tailwind-unwind
 ```
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--min-occurrences <n>` | `5` | Minimum occurrences (combinations must appear **more than** n times) |
-| `--min-size <n>` | `2` | Minimum classes per combination |
-| `--max-size <n>` | `5` | Maximum classes per combination |
-| `--top <n>` | `10` | Number of top combinations to show |
-| `--format <type>` | `console` | Output format: `console` or `json` |
-| `--no-dedupe-subsets` | — | Include subset combinations in results |
-| `--config <file>` | — | Path to config file |
-| `--include <patterns>` | all `src` | Comma-separated glob include patterns |
-| `--exclude <patterns>` | — | Comma-separated glob exclude patterns |
+## How the three commands differ
+
+| Command | What it does |
+|---------|--------------|
+| `analyze` | Shows which class combinations repeat and where. Safe — read-only. |
+| `generate` | Creates a CSS file with `@layer components` + `@apply`. Does not touch your `.tsx` files. |
+| `apply` | Does what `generate` does **and** rewrites matching `className` in source files. |
+
+**Important:** `analyze` looks for frequent patterns (including subsets). `generate` and `apply` only work with **exact duplicate** class strings that appear multiple times.
+
+In the analyze report, look for `Extractable: yes` — those patterns can be passed to `generate` / `apply`.
+
+## Typical workflow
 
 ```bash
-# JSON report for CI
-npx tailwind-unwind analyze ./src --format json
+# Optional: create config from your project
+npx tailwind-unwind init ./src
 
-# Stricter filters
-npx tailwind-unwind analyze ./src --min-occurrences 10 --top 5
-```
-
-**Example output:**
-
-```
-📊 Tailwind Analysis Report
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Files scanned: 47
-Components with className: 312
-Unique class combinations: 89
-
-🏆 Top 10 most frequent combinations:
-
-1. "flex items-center justify-between p-4"
-   Occurrences: 24
-   Suggestion: .page-header
-   Extractable: yes — use generate/apply
-   Found in: src/components/Header.tsx:12, src/layout/Toolbar.tsx:5 (+18 more)
-
-💡 Potential code reduction: 38%
-💡 Generate CSS: npx tailwind-unwind generate <path> --output styles.css
-💡 Apply classes: npx tailwind-unwind apply <path> --output styles.css
-```
-
-`analyze` finds frequent **subsets** of classes (2–5 utilities) and deduplicates subsets by default.
-
----
-
-### `generate`
-
-Extract **exact duplicate `className` strings** into reusable component classes.
-
-```bash
-npx tailwind-unwind generate <path> --output <file.css>
-```
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--output <file>` | *(required)* | Output CSS file path |
-| `--min-occurrences <n>` | `3` | Minimum occurrences (must appear **≥ n** times) |
-| `--min-size <n>` | `2` | Minimum classes per set |
-| `--max-size <n>` | `5` | Maximum classes per set |
-| `--top <n>` | `10` | Max number of component classes to generate |
-| `--prefix <name>` | `twu-` | Namespace prefix for generated classes |
-| `--format <type>` | `console` | Output format: `console` or `json` |
-| `--from-report <file>` | — | Generate from `analyze --format json` output |
-| `--extractable-only` | — | Only patterns marked extractable in analyze |
-
-```bash
-npx tailwind-unwind generate ./src --output styles.css
+# Analyze → save report
 npx tailwind-unwind analyze ./src --format json > report.json
-npx tailwind-unwind generate --from-report report.json --output styles.css
-npx tailwind-unwind generate ./src --output styles.css --extractable-only --format json
+
+# Generate only extractable patterns from the report
+npx tailwind-unwind generate --from-report report.json --output src/styles/components.css
+
+# Preview replacements, then apply
+npx tailwind-unwind apply ./src --output src/styles/components.css --dry-run
+npx tailwind-unwind apply ./src --output src/styles/components.css --prettier
 ```
 
-**Example output (`styles.css`):**
+## Configuration
 
-```css
-/**
- * Generated by tailwind-unwind
- * Source: ./src
- * Class prefix: twu-
- */
-@layer components {
-  .twu-page-header {
-    @apply flex items-center justify-between p-4;
-  }
-
-  .twu-media-cover {
-    @apply w-full h-auto object-cover rounded-lg;
-  }
-
-  .twu-primary-button {
-    @apply bg-blue-500 text-white px-4 py-2 rounded-lg;
-  }
-}
-```
-
-Import `styles.css` in your global CSS, then use the generated classes in JSX.
-
----
-
-### `apply`
-
-Generate CSS **and** replace matching `className` strings in source files.
+Create `tailwind-unwind.config.json` manually or run `init`:
 
 ```bash
-npx tailwind-unwind apply <path> --output <file.css>
+npx tailwind-unwind init ./src
 ```
 
-Supports the same flags as `generate`, plus:
+Also supported: `.tailwind-unwindrc`, `tailwind-unwind.config.ts` / `.js`.
 
-| Flag | Description |
-|------|-------------|
-| `--dry-run` | Preview replacements without writing files |
-| `--prettier` | Format modified files with Prettier (optional peer dependency) |
-| `--format json` | Machine-readable output for CI |
+Example — see [`tailwind-unwind.config.example.json`](tailwind-unwind.config.example.json).
 
-```bash
-npx tailwind-unwind apply ./src --output styles.css --dry-run
-npx tailwind-unwind apply ./src --output styles.css --prettier
-npx tailwind-unwind apply ./src --output styles.css --from-report report.json --format json
-```
+Key options:
 
-**What gets replaced:**
+- `include` / `exclude` — which files to scan
+- `names` — map utilities to your class names (`"flex p-4"` → `"toolbar"`)
+- `analyze` / `generate` / `apply` — per-command settings
 
-| Pattern | Replaced? |
-|---------|-----------|
-| `className="flex items-center p-4"` | ✅ |
-| `className={cn('flex', 'items-center', 'p-4')}` | ✅ (static args only) |
-| `className={cn('flex p-4', isActive && 'bg-blue')}` | ✅ partial |
-| `` className={`flex p-4 ${active ? 'bg-blue' : ''}`} `` | ✅ partial (static part) |
-| `className={buttonVariants()}` | ✅ (cva/tv, no args) |
-| `className={getClasses()}` | ❌ skipped |
+CLI flags override config values.
 
-**Before → After:**
+## What `apply` can replace
 
-```tsx
-// before
-<div className="flex items-center justify-between p-4">Header</div>
+| Pattern | Supported? |
+|---------|------------|
+| `className="flex p-4 bg-blue"` | Yes |
+| `className={cn('flex', 'p-4')}` | Yes |
+| `className={cn('flex p-4', isActive && 'bg-blue')}` | Yes (static part only) |
+| `` className={`flex p-4 ${x}`} `` | Yes (static part only) |
+| `className={buttonVariants()}` | Yes (cva/tv, no arguments) |
+| `className={getClasses()}` | No — skipped |
 
-// after
-<div className="twu-page-header">Header</div>
-```
+Parsed: `cn`, `clsx`, `classnames`, `twMerge`, `cva`, `tv`, template literals.  
+Class order does not matter (`flex p-4` = `p-4 flex`).
 
----
+## Generated class names
 
-## Class naming
+Default prefix is `twu-` to avoid clashes with your existing styles:
 
-Generated classes use a **`twu-` prefix** by default to avoid conflicts with existing project styles. Names are derived from semantic rules, not utility concatenation:
-
-| Utilities | Generated class |
-|-----------|-----------------|
+| Repeated utilities | Becomes |
+|--------------------|---------|
 | `flex items-center justify-between p-4` | `twu-page-header` |
 | `w-full object-cover rounded-lg` | `twu-media-cover` |
-| `bg-blue-500 px-4 py-2 rounded-lg` | `twu-primary-button` |
-| `grid grid-cols-3 gap-4` | `twu-card-grid` |
-| `fixed inset-0 bg-black/50` | `twu-backdrop` |
 
-Customize with `--prefix app-` or the `names` field in config:
+Override with `--prefix app-` or the `names` field in config.
 
-```json
-{
-  "names": {
-    "flex items-center justify-between p-4": "page-header"
-  },
-  "generate": { "prefix": "app-" }
-}
-```
+## Useful flags
 
-→ `.app-page-header`
+| Flag | Commands | Purpose |
+|------|----------|---------|
+| `--dry-run` | apply | Preview without writing files |
+| `--prettier` | apply | Format changed files with Prettier |
+| `--format json` | analyze, generate, apply | Output for CI / scripts |
+| `--changed [ref]` | all | Only git-changed files |
+| `--from-report <file>` | generate, apply | Use analyze JSON output |
+| `--extractable-only` | generate, apply | Only patterns marked extractable |
+| `--config <file>` | all | Custom config path |
+| `--include` / `--exclude` | all | Filter files by glob |
 
----
+### Defaults
 
-## What gets parsed
-
-Scans `.tsx`, `.jsx`, `.ts`, `.js` recursively. Ignores `node_modules`, `.next`, `dist`, `build`, `.git`.
-
-- **Static strings:** `className="flex p-4"` / `class="flex p-4"`
-- **Template literals:** static segments extracted; `${...}` expressions flagged
-- **Merge utilities:** `cn()`, `clsx()`, `classnames()`, `twMerge()`, `cx()`
-- **Variant APIs:** `cva()`, `tv()` definitions and no-arg calls like `buttonVariants()`
-- **Dynamic expressions:** `className={getClasses()}` — warning, skipped
-
-Class order is normalized: `flex p-4` and `p-4 flex` are treated as the same set.
-
----
+| | analyze | generate / apply |
+|--|---------|------------------|
+| `--min-occurrences` | 5 | 3 |
+| `--prefix` | — | `twu-` |
 
 ## Programmatic API
 
 ```typescript
-import {
-  analyzeCommand,
-  generateCommand,
-  applyCommand,
-  walkSourceFiles,
-  parseFile,
-  findFrequentPatterns,
-  findRepeatedClassSets,
-  buildComponents,
-  normalizeClasses,
-} from 'tailwind-unwind';
+import { analyzeCommand, generateCommand, applyCommand, buildComponents } from 'tailwind-unwind';
 
-// Analyze
 await analyzeCommand('./src', { format: 'json' });
-
-// Build component map
-const files = await walkSourceFiles('./src');
-const result = await parseFile(files[0]);
-
-const { components, css, replacementMap } = buildComponents(
-  [{ classes: result.extractions[0].classes, filePath: files[0] }],
-  { sourcePath: './src', prefix: 'twu-' },
-);
 ```
 
----
+Full exports: `walkSourceFiles`, `parseFile`, `findRepeatedClassSets`, `buildComponents`, `loadCommandOptions`, and more.
+
+## GitHub Action
+
+```yaml
+- uses: AVPletnev/tailwind-unwind@v0.4.0
+  with:
+    command: analyze
+    path: ./src
+    format: json
+```
+
+See [`action.yml`](action.yml) for inputs.
 
 ## Development
 
 ```bash
 git clone https://github.com/AVPletnev/tailwind-unwind.git
-cd tailwind-unwind
-npm install
-npm run build    # required before running CLI locally
-npm test
-
-node bin/index.js analyze ./test-project
-node bin/index.js generate ./test-project --output styles.css
-node bin/index.js apply ./test-project --output styles.css --dry-run
+cd tailwind-unwind && npm install && npm run build && npm test
 ```
-
-> **Note:** `bin/index.js` runs compiled code from `dist/`. Always run `npm run build` after changing source files.
-
----
 
 ## License
 

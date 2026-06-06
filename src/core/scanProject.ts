@@ -12,6 +12,7 @@ import type {
   AnalysisReport,
   ClassNameOccurrence,
 } from '../parser/types.js';
+import { getChangedFilesInScope } from '../scanner/gitChanged.js';
 import { walkSourceFiles } from '../scanner/fileWalker.js';
 
 async function pathExists(targetPath: string): Promise<boolean> {
@@ -29,6 +30,8 @@ export interface ScanProjectOptions extends PatternFinderOptions {
   exclude?: string[];
   /** Threshold used to mark combinations as extractable by generate/apply */
   extractableMinOccurrences?: number;
+  /** Scan only git-changed files; string value is the git ref to diff against */
+  changed?: boolean | string;
 }
 
 export interface ScanProjectResult {
@@ -51,15 +54,24 @@ export async function scanProject(
     throw new Error(`Path does not exist: ${resolvedPath}`);
   }
 
-  const files = await walkSourceFiles(resolvedPath, {
-    include: options.include,
-    exclude: options.exclude,
-  });
+  let files: string[];
+
+  if (options.changed !== undefined) {
+    const ref = typeof options.changed === 'string' ? options.changed : 'HEAD';
+    files = await getChangedFilesInScope(resolvedPath, ref);
+  } else {
+    files = await walkSourceFiles(resolvedPath, {
+      include: options.include,
+      exclude: options.exclude,
+    });
+  }
 
   if (files.length === 0) {
-    throw new Error(
-      `No source files (.tsx, .jsx, .ts, .js) found in: ${resolvedPath}`,
-    );
+    const hint =
+      options.changed !== undefined
+        ? 'No changed source files found for the current git diff.'
+        : `No source files (.tsx, .jsx, .ts, .js) found in: ${resolvedPath}`;
+    throw new Error(hint);
   }
 
   const occurrences: ClassNameOccurrence[] = [];

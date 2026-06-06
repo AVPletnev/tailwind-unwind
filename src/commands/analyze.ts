@@ -23,6 +23,7 @@ export async function analyzeCommand(
       dedupeSubsets: options.dedupeSubsets,
       include: options.include,
       exclude: options.exclude,
+      changed: options.changed,
       extractableMinOccurrences: 3,
     });
   } catch (error) {

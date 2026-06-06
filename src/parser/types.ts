@@ -63,4 +63,6 @@ export interface AnalyzeOptions {
   prettier?: boolean;
   fromReport?: string;
   extractableOnly?: boolean;
+  changed?: boolean | string;
+  force?: boolean;
 }

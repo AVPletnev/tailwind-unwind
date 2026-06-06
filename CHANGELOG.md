@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0
+
+### Added
+- `init` command — generates `tailwind-unwind.config.json` from project scan
+- `--changed [ref]` — scan only git-changed files (incremental mode)
+- Savings report in `apply` (utility tokens before/after, % reduction)
+- `tailwind-unwind.config.ts` support via `jiti`
+- GitHub Action (`action.yml`) for CI workflows
+- Example workflow for analyze + apply dry-run in PRs
+
 ## 0.3.0
 
 ### Added

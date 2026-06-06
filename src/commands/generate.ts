@@ -53,6 +53,7 @@ export async function generateCommand(
         targetPath,
         include: options.include,
         exclude: options.exclude,
+        changed: options.changed,
         extractableMinOccurrences: options.minOccurrences ?? 3,
       });
 

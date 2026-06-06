@@ -1,4 +1,4 @@
-export type CliCommand = 'analyze' | 'generate' | 'apply';
+export type CliCommand = 'analyze' | 'generate' | 'apply' | 'init';
 
 export interface CommandConfig {
   minOccurrences?: number;
@@ -39,4 +39,6 @@ export interface ScanOptions {
 
 export interface ResolvedCommandOptions extends TailwindUnwindConfig {
   configPath?: string;
+  changed?: boolean | string;
+  force?: boolean;
 }

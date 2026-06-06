@@ -8,6 +8,7 @@ import {
   buildComponentsFromCombinations,
 } from '../core/buildComponents.js';
 import { loadExtractableCombinations } from '../core/loadAnalyzeReport.js';
+import { calculateSavings, type SavingsReport } from '../analyzer/savings.js';
 import { scanProject } from '../core/scanProject.js';
 import type { AnalyzeOptions } from '../parser/types.js';
 import {
@@ -29,6 +30,7 @@ export interface ApplyResult {
   replacements: ApplyJsonReport['replacements'];
   skipped: ApplyJsonReport['skipped'];
   prettierFormatted: string[];
+  savings: SavingsReport;
 }
 
 /**
@@ -45,6 +47,7 @@ export async function applyCommand(
       targetPath,
       include: options.include,
       exclude: options.exclude,
+      changed: options.changed,
       extractableMinOccurrences: options.minOccurrences ?? 3,
     });
   } catch (error) {
@@ -167,6 +170,8 @@ export async function applyCommand(
     await fs.writeFile(outputPath, css, 'utf-8');
   }
 
+  const savings = calculateSavings(allReplacements);
+
   const result: ApplyResult = {
     filesModified,
     replacementsTotal,
@@ -176,6 +181,7 @@ export async function applyCommand(
     replacements: allReplacements,
     skipped: allSkipped,
     prettierFormatted,
+    savings,
   };
 
   if (options.format === 'json') {
@@ -189,6 +195,7 @@ export async function applyCommand(
       components,
       replacements: allReplacements,
       skipped: allSkipped,
+      savings,
     });
     return result;
   }
@@ -215,6 +222,26 @@ export async function applyCommand(
     console.log(
       chalk.gray(`   Prettier formatted: `) +
         chalk.white(String(prettierFormatted.length)),
+    );
+  }
+
+  if (savings.replacementCount > 0) {
+    console.log('');
+    console.log(chalk.bold('Savings:'));
+    console.log(
+      chalk.gray('   Utility tokens before: ') +
+        chalk.white(String(savings.utilityTokensBefore)),
+    );
+    console.log(
+      chalk.gray('   Utility tokens after: ') +
+        chalk.white(String(savings.utilityTokensAfter)),
+    );
+    console.log(
+      chalk.gray('   Tokens saved: ') + chalk.green(String(savings.tokensSaved)),
+    );
+    console.log(
+      chalk.gray('   Reduction: ') +
+        chalk.green(`${savings.percentReduction}%`),
     );
   }
 

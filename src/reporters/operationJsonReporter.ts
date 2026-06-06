@@ -1,3 +1,4 @@
+import type { SavingsReport } from '../analyzer/savings.js';
 import type { GeneratedComponent } from '../generator/cssGenerator.js';
 import type {
   ClassReplacement,
@@ -22,6 +23,7 @@ export interface ApplyJsonReport {
   components: GeneratedComponent[];
   replacements: ClassReplacement[];
   skipped: SkippedReplacement[];
+  savings: SavingsReport;
 }
 
 export function printGenerateJsonReport(report: GenerateJsonReport): void {

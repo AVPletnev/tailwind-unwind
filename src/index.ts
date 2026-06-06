@@ -7,7 +7,14 @@ export type {
   TailwindUnwindConfig,
   TailwindUnwindConfigFile,
 } from './config/types.js';
+export { initCommand } from './commands/init.js';
 export { analyzeCommand } from './commands/analyze.js';
+export { calculateSavings } from './analyzer/savings.js';
+export {
+  getChangedFilesInScope,
+  getChangedSourceFiles,
+  isGitRepository,
+} from './scanner/gitChanged.js';
 export { applyCommand } from './commands/apply.js';
 export { generateCommand } from './commands/generate.js';
 export { scanProject } from './core/scanProject.js';

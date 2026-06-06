@@ -1,0 +1,49 @@
+name: tailwind-unwind
+description: Analyze and refactor repeated Tailwind CSS class patterns
+branding:
+  icon: wind
+  color: blue
+inputs:
+  command:
+    description: Command to run (analyze, generate, apply, init)
+    required: true
+    default: analyze
+  path:
+    description: Project path to scan
+    required: true
+    default: .
+  output:
+    description: CSS output path for generate/apply
+    required: false
+    default: styles/components.css
+  format:
+    description: Output format (console or json)
+    required: false
+    default: console
+  args:
+    description: Additional CLI arguments
+    required: false
+    default: ''
+runs:
+  using: composite
+  steps:
+    - name: Run tailwind-unwind
+      shell: bash
+      run: |
+        set -euo pipefail
+        ARGS=("${{ inputs.command }}" "${{ inputs.path }}")
+
+        if [[ "${{ inputs.command }}" == "generate" || "${{ inputs.command }}" == "apply" ]]; then
+          ARGS+=(--output "${{ inputs.output }}")
+        fi
+
+        if [[ -n "${{ inputs.format }}" ]]; then
+          ARGS+=(--format "${{ inputs.format }}")
+        fi
+
+        if [[ -n "${{ inputs.args }}" ]]; then
+          read -r -a EXTRA <<< "${{ inputs.args }}"
+          ARGS+=("${EXTRA[@]}")
+        fi
+
+        npx tailwind-unwind@latest "${ARGS[@]}"

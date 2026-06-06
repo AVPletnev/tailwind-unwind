@@ -38,6 +38,8 @@ export interface RawCliOptions {
   prettier?: boolean;
   fromReport?: string;
   extractableOnly?: boolean;
+  changed?: string | boolean;
+  force?: boolean;
 }
 
 function cliNumber(
@@ -75,6 +77,8 @@ export async function resolveCommandOptions(
     prettier: opts.prettier,
     fromReport: opts.fromReport,
     extractableOnly: opts.extractableOnly,
+    changed: parseChanged(opts.changed),
+    force: opts.force,
   },
     { targetPath },
   );
@@ -96,7 +100,25 @@ export async function resolveCommandOptions(
     prettier: opts.prettier ?? resolved.prettier,
     fromReport: opts.fromReport ?? resolved.fromReport,
     extractableOnly: opts.extractableOnly ?? resolved.extractableOnly,
+    changed: parseChanged(opts.changed) ?? resolved.changed,
+    force: opts.force ?? resolved.force,
   };
+}
+
+function parseChanged(value: unknown): boolean | string | undefined {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+
+  if (value === true || value === 'true') {
+    return true;
+  }
+
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  return undefined;
 }
 
 export function withNumericDefaults(

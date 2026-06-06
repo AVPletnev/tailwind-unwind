@@ -11,6 +11,7 @@ import type {
 import { normalizeNamesConfig, validateConfigFile } from './validate.js';
 
 const CONFIG_FILENAMES = [
+  'tailwind-unwind.config.ts',
   'tailwind-unwind.config.js',
   'tailwind-unwind.config.mjs',
   'tailwind-unwind.config.cjs',
@@ -143,7 +144,13 @@ function mergeCommandConfig(
 ): TailwindUnwindConfig {
   const { analyze, generate, apply, ...root } = fileConfig;
   const commandSection =
-    command === 'analyze' ? analyze : command === 'generate' ? generate : apply;
+    command === 'analyze'
+      ? analyze
+      : command === 'generate'
+        ? generate
+        : command === 'apply'
+          ? apply
+          : undefined;
 
   return {
     ...root,
@@ -222,6 +229,12 @@ async function resolveConfigFile(
 }
 
 async function importConfigModule(configPath: string): Promise<unknown> {
+  if (configPath.endsWith('.ts')) {
+    const { createJiti } = await import('jiti');
+    const jiti = createJiti(import.meta.url, { interopDefault: true });
+    return jiti(configPath);
+  }
+
   const moduleUrl = pathToFileURL(configPath).href;
   const imported = await import(moduleUrl);
   return imported;

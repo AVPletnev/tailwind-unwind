@@ -5,6 +5,7 @@ import chalk from 'chalk';
 import { analyzeCommand } from '../commands/analyze.js';
 import { applyCommand } from '../commands/apply.js';
 import { generateCommand } from '../commands/generate.js';
+import { initCommand } from '../commands/init.js';
 import { ANALYZE_DEFAULTS, GENERATE_DEFAULTS } from './defaults.js';
 import { resolveCommandOptions, withNumericDefaults } from './parseOptions.js';
 import { CLI_VERSION } from './version.js';
@@ -21,13 +22,62 @@ function addSharedOptions(command: Command): Command {
     .option(
       '--exclude <patterns>',
       'Comma-separated glob exclude patterns (e.g. "**/*.test.tsx")',
+    )
+    .option(
+      '--changed [ref]',
+      'Only scan git-changed files (optional ref, default: working tree vs HEAD)',
     );
+}
+
+function resolveChangedFlag(opts: { changed?: string | boolean }): boolean | string | undefined {
+  if (!process.argv.includes('--changed')) {
+    return undefined;
+  }
+
+  if (typeof opts.changed === 'string' && opts.changed.length > 0) {
+    return opts.changed;
+  }
+
+  return true;
 }
 
 program
   .name('tailwind-unwind')
   .description('Analyze Tailwind CSS class usage in React/Next.js projects')
   .version(CLI_VERSION);
+
+program
+  .command('init')
+  .description('Create a starter tailwind-unwind.config.json from project scan')
+  .argument('<path>', 'Project directory')
+  .option('--output <file>', 'Config output path')
+  .option('--force', 'Overwrite existing config file')
+  .option('--min-occurrences <n>', 'Minimum occurrences threshold')
+  .option('--top <n>', 'Number of patterns to include in names')
+  .option('--prefix <name>', 'Namespace prefix for generated classes')
+  .action(async (targetPath: string, opts) => {
+    try {
+      const resolved = withNumericDefaults(
+        await resolveCommandOptions('init', opts, targetPath),
+        opts,
+        ANALYZE_DEFAULTS,
+      );
+
+      await initCommand(targetPath, {
+        output: opts.output ?? resolved.output,
+        force: Boolean(opts.force || resolved.force),
+        minOccurrences: resolved.minOccurrences,
+        top: resolved.top,
+        prefix: resolved.prefix ?? GENERATE_DEFAULTS.prefix,
+        include: resolved.include,
+        exclude: resolved.exclude,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(chalk.red(`Error: ${message}`));
+      process.exit(1);
+    }
+  });
 
 addSharedOptions(
   program
@@ -43,7 +93,7 @@ addSharedOptions(
 ).action(async (targetPath: string, opts) => {
   try {
     const resolved = withNumericDefaults(
-      await resolveCommandOptions('analyze', opts, targetPath),
+      await resolveCommandOptions('analyze', { ...opts, changed: resolveChangedFlag(opts) }, targetPath),
       opts,
       ANALYZE_DEFAULTS,
     );
@@ -59,6 +109,7 @@ addSharedOptions(
         : (resolved.dedupeSubsets ?? true),
       include: resolved.include,
       exclude: resolved.exclude,
+      changed: resolved.changed,
       configPath: resolved.configPath,
     });
   } catch (error) {
@@ -85,7 +136,7 @@ addSharedOptions(
 ).action(async (targetPath: string | undefined, opts) => {
   try {
     const resolved = withNumericDefaults(
-      await resolveCommandOptions('generate', opts, targetPath),
+      await resolveCommandOptions('generate', { ...opts, changed: resolveChangedFlag(opts) }, targetPath),
       opts,
       GENERATE_DEFAULTS,
     );
@@ -111,6 +162,7 @@ addSharedOptions(
       prefix: resolved.prefix,
       include: resolved.include,
       exclude: resolved.exclude,
+      changed: resolved.changed,
       configPath: resolved.configPath,
       names: resolved.names,
       format: resolved.format,
@@ -143,7 +195,7 @@ addSharedOptions(
 ).action(async (targetPath: string, opts) => {
   try {
     const resolved = withNumericDefaults(
-      await resolveCommandOptions('apply', opts, targetPath),
+      await resolveCommandOptions('apply', { ...opts, changed: resolveChangedFlag(opts) }, targetPath),
       opts,
       GENERATE_DEFAULTS,
     );
@@ -163,6 +215,7 @@ addSharedOptions(
       prefix: resolved.prefix,
       include: resolved.include,
       exclude: resolved.exclude,
+      changed: resolved.changed,
       configPath: resolved.configPath,
       names: resolved.names,
       format: resolved.format,
