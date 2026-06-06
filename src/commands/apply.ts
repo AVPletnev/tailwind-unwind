@@ -9,6 +9,11 @@ import {
 } from '../core/buildComponents.js';
 import { loadExtractableCombinations } from '../core/loadAnalyzeReport.js';
 import { calculateSavings, type SavingsReport } from '../analyzer/savings.js';
+import {
+  runWithSpinner,
+  scanProjectWithSpinner,
+  shouldShowProgress,
+} from '../cli/spinner.js';
 import { scanProject } from '../core/scanProject.js';
 import type { AnalyzeOptions } from '../parser/types.js';
 import {
@@ -45,15 +50,31 @@ export async function applyCommand(
   options: ApplyOptions,
 ): Promise<ApplyResult> {
   let scanResult: Awaited<ReturnType<typeof scanProject>>;
+  const showProgress = shouldShowProgress(options);
+  const useOwnSpinner = showProgress && !options.quiet;
 
   try {
-    scanResult = await scanProject({
-      targetPath,
-      include: options.include,
-      exclude: options.exclude,
-      changed: options.changed,
-      extractableMinOccurrences: options.minOccurrences ?? 3,
-    });
+    if (useOwnSpinner) {
+      scanResult = await scanProjectWithSpinner(
+        {
+          targetPath,
+          include: options.include,
+          exclude: options.exclude,
+          changed: options.changed,
+          extractableMinOccurrences: options.minOccurrences ?? 3,
+        },
+        { showProgress: true },
+      );
+    } else {
+      scanResult = await scanProject({
+        targetPath,
+        include: options.include,
+        exclude: options.exclude,
+        changed: options.changed,
+        extractableMinOccurrences: options.minOccurrences ?? 3,
+        onParseProgress: options.onParseProgress,
+      });
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(chalk.red(`Error: ${message}`));
@@ -71,44 +92,54 @@ export async function applyCommand(
   let replacementMap: Map<string, string>;
 
   try {
-    if (options.fromReport) {
-      const loadedReport = await loadExtractableCombinations(options.fromReport, {
-        extractableOnly: options.extractableOnly ?? true,
-      });
-      const built = buildComponentsFromCombinations(loadedReport.combinations, {
-        sourcePath: scanResult.resolvedPath,
-        prefix: options.prefix,
-        names: options.names,
-      });
-      components = built.components;
-      css = built.css;
-      replacementMap = built.replacementMap;
-    } else if (options.extractableOnly) {
-      const combinations = scanResult.report.stats.topCombinations.filter(
-        (combo) => combo.extractable,
-      );
-      const built = buildComponentsFromCombinations(combinations, {
-        sourcePath: scanResult.resolvedPath,
-        prefix: options.prefix,
-        names: options.names,
-      });
-      components = built.components;
-      css = built.css;
-      replacementMap = built.replacementMap;
-    } else {
-      const built = buildComponents(scanResult.occurrences, {
-        sourcePath: scanResult.resolvedPath,
-        minOccurrences: options.minOccurrences ?? 3,
-        minSize: options.minSize,
-        maxSize: options.maxSize,
-        topLimit: options.top,
-        prefix: options.prefix,
-        names: options.names,
-      });
-      components = built.components;
-      css = built.css;
-      replacementMap = built.replacementMap;
-    }
+    const built = await runWithSpinner(
+      useOwnSpinner,
+      'Building components',
+      async (update) => {
+        update('Building components');
+
+        if (options.fromReport) {
+          const loadedReport = await loadExtractableCombinations(
+            options.fromReport,
+            {
+              extractableOnly: options.extractableOnly ?? true,
+            },
+          );
+          return buildComponentsFromCombinations(loadedReport.combinations, {
+            sourcePath: scanResult.resolvedPath,
+            prefix: options.prefix,
+            names: options.names,
+          });
+        }
+
+        if (options.extractableOnly) {
+          const topLimit =
+            options.top ?? scanResult.extractableCombinations.length;
+          const combinations = scanResult.extractableCombinations.slice(
+            0,
+            topLimit,
+          );
+          return buildComponentsFromCombinations(combinations, {
+            sourcePath: scanResult.resolvedPath,
+            prefix: options.prefix,
+            names: options.names,
+          });
+        }
+
+        return buildComponents(scanResult.occurrences, {
+          sourcePath: scanResult.resolvedPath,
+          minOccurrences: options.minOccurrences ?? 3,
+          minSize: options.minSize,
+          maxSize: options.maxSize,
+          topLimit: options.top,
+          prefix: options.prefix,
+          names: options.names,
+        });
+      },
+    );
+    components = built.components;
+    css = built.css;
+    replacementMap = built.replacementMap;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(chalk.red(`Error: ${message}`));
@@ -146,46 +177,64 @@ export async function applyCommand(
   const modifiedSources = new Map<string, string>();
   const modifiedFiles: string[] = [];
 
-  for (const file of scanResult.files) {
-    const original = await fs.readFile(file, 'utf-8');
-    const result = replaceClassNamesInSource(
-      original,
-      replacementMap,
-      file,
-    );
+  const replacementLabel = options.dryRun
+    ? 'Previewing replacements'
+    : 'Applying replacements';
 
-    replacementsTotal += result.replacements.length;
-    allReplacements.push(...result.replacements);
-    allSkipped.push(...result.skipped);
+  await runWithSpinner(useOwnSpinner, replacementLabel, async (update) => {
+    const files = scanResult.files;
 
-    if (result.changed) {
-      filesModified += 1;
-      modifiedSources.set(file, result.source);
-      modifiedFiles.push(file);
+    for (let index = 0; index < files.length; index += 1) {
+      const file = files[index]!;
+      update(`${replacementLabel}... ${index + 1}/${files.length}`);
+
+      const original = await fs.readFile(file, 'utf-8');
+      const result = replaceClassNamesInSource(
+        original,
+        replacementMap,
+        file,
+      );
+
+      replacementsTotal += result.replacements.length;
+      allReplacements.push(...result.replacements);
+      allSkipped.push(...result.skipped);
+
+      if (result.changed) {
+        filesModified += 1;
+        modifiedSources.set(file, result.source);
+        modifiedFiles.push(file);
+      }
     }
-  }
+  });
 
   let prettierFormatted: string[] = [];
 
   if (!options.dryRun && options.prettier && modifiedFiles.length > 0) {
-    const formatResult = await formatModifiedFiles(
-      modifiedFiles,
-      modifiedSources,
-      process.cwd(),
-    );
-    prettierFormatted = formatResult.formatted;
+    await runWithSpinner(useOwnSpinner, 'Formatting with Prettier', async (update) => {
+      update('Formatting with Prettier');
+      const formatResult = await formatModifiedFiles(
+        modifiedFiles,
+        modifiedSources,
+        process.cwd(),
+      );
+      prettierFormatted = formatResult.formatted;
+    });
   }
 
   if (!options.dryRun) {
-    for (const file of modifiedFiles) {
-      const source = modifiedSources.get(file);
-      if (source) {
-        await fs.writeFile(file, source, 'utf-8');
+    await runWithSpinner(useOwnSpinner, 'Writing files', async (update) => {
+      update('Writing source files');
+      for (const file of modifiedFiles) {
+        const source = modifiedSources.get(file);
+        if (source) {
+          await fs.writeFile(file, source, 'utf-8');
+        }
       }
-    }
 
-    await fs.mkdir(path.dirname(outputPath), { recursive: true });
-    await fs.writeFile(outputPath, css, 'utf-8');
+      update('Writing CSS');
+      await fs.mkdir(path.dirname(outputPath), { recursive: true });
+      await fs.writeFile(outputPath, css, 'utf-8');
+    });
   }
 
   const savings = calculateSavings(allReplacements);

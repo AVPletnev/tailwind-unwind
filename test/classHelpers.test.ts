@@ -48,6 +48,17 @@ describe('classHelpers', () => {
     expect(result.isDynamic).toBe(false);
   });
 
+  it('extracts classes from className arrow functions', () => {
+    const result = extractClassesFromExpression(
+      parseExpression(
+        "({ isActive }) => isActive ? 'flex p-4 text-accent' : 'flex p-4 text-muted'",
+      ),
+    );
+
+    expect(result.classes).toEqual(['flex', 'p-4', 'text-accent', 'text-muted']);
+    expect(result.isDynamic).toBe(true);
+  });
+
   it('marks unknown call expressions as dynamic', () => {
     const result = extractClassesFromExpression(
       parseExpression("getClasses('flex')"),

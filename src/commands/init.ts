@@ -1,7 +1,11 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import chalk from 'chalk';
-import { scanProject } from '../core/scanProject.js';
+import {
+  scanProjectWithSpinner,
+  shouldShowProgress,
+} from '../cli/spinner.js';
+import type { ScanProjectResult } from '../core/scanProject.js';
 import type { TailwindUnwindConfigFile } from '../config/types.js';
 import type { AnalyzeOptions } from '../parser/types.js';
 
@@ -29,7 +33,7 @@ function detectIncludePattern(targetPath: string): string[] {
 }
 
 function buildConfigFromScan(
-  scanResult: Awaited<ReturnType<typeof scanProject>>,
+  scanResult: ScanProjectResult,
   targetPath: string,
   options: InitOptions,
 ): TailwindUnwindConfigFile {
@@ -87,17 +91,23 @@ export async function initCommand(
     );
   }
 
-  const scanResult = await scanProject({
-    targetPath: resolvedPath,
-    minOccurrences: options.minOccurrences ?? 5,
-    minSize: options.minSize,
-    maxSize: options.maxSize,
-    topLimit: options.top ?? 10,
-    dedupeSubsets: options.dedupeSubsets ?? true,
-    include: options.include,
-    exclude: options.exclude,
-    extractableMinOccurrences: 3,
-  });
+  const scanResult = await scanProjectWithSpinner(
+    {
+      targetPath: resolvedPath,
+      minOccurrences: options.minOccurrences ?? 5,
+      minSize: options.minSize,
+      maxSize: options.maxSize,
+      topLimit: options.top ?? 10,
+      dedupeSubsets: options.dedupeSubsets ?? true,
+      include: options.include,
+      exclude: options.exclude,
+      extractableMinOccurrences: 3,
+    },
+    {
+      label: 'Analyzing project',
+      showProgress: shouldShowProgress(options),
+    },
+  );
 
   const config = buildConfigFromScan(scanResult, resolvedPath, options);
   const json = `${JSON.stringify(config, null, 2)}\n`;

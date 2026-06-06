@@ -10,6 +10,7 @@ import type {
   Node,
 } from '@babel/types';
 import { normalizeClasses } from '../analyzer/combiner.js';
+import { replaceInExpression } from './expressionReplace.js';
 import {
   CLASS_MERGE_CALLEES,
   extractClassesFromExpression,
@@ -287,6 +288,16 @@ function tryReplaceClassAttribute(
 
   if (isClassMergeCall(expression)) {
     return tryReplaceMergeCall(expression, replacementMap);
+  }
+
+  const dynamicReplacement = replaceInExpression(expression, replacementMap);
+  if (dynamicReplacement.changed) {
+    return {
+      expression: dynamicReplacement.node,
+      from: dynamicReplacement.from,
+      to: dynamicReplacement.to,
+      partial: dynamicReplacement.partial,
+    };
   }
 
   return tryReplaceTemplateLiteral(attr, replacementMap, registry);

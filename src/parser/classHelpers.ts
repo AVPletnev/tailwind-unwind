@@ -1,8 +1,10 @@
 import type {
   ArrayExpression,
+  ArrowFunctionExpression,
   CallExpression,
   ConditionalExpression,
   Expression,
+  FunctionExpression,
   LogicalExpression,
   TemplateLiteral,
 } from '@babel/types';
@@ -169,9 +171,61 @@ export function extractClassesFromExpression(
       // clsx object form: { 'p-4': isActive } — keys are potential classes
       return extractFromObjectExpression(expression);
 
+    case 'ArrowFunctionExpression':
+    case 'FunctionExpression':
+      return extractFromFunctionExpression(expression, registry);
+
     default:
       return { classes: [], isDynamic: true };
   }
+}
+
+function unwrapExpression(expression: Expression): Expression {
+  if (expression.type === 'ParenthesizedExpression') {
+    return unwrapExpression(expression.expression);
+  }
+
+  return expression;
+}
+
+function collectFunctionReturnExpressions(
+  body: ArrowFunctionExpression['body'] | FunctionExpression['body'],
+): Expression[] {
+  if (body.type !== 'BlockStatement') {
+    return [unwrapExpression(body)];
+  }
+
+  const expressions: Expression[] = [];
+
+  for (const statement of body.body) {
+    if (statement.type === 'ReturnStatement' && statement.argument) {
+      expressions.push(statement.argument);
+    }
+  }
+
+  return expressions;
+}
+
+/**
+ * NavLink-style className={({ isActive }) => isActive ? '...' : '...'}
+ */
+function extractFromFunctionExpression(
+  node: ArrowFunctionExpression | FunctionExpression,
+  registry?: VariantRegistry,
+): ExtractedClasses {
+  const returnExpressions = collectFunctionReturnExpressions(node.body);
+
+  if (returnExpressions.length === 0) {
+    return { classes: [], isDynamic: true };
+  }
+
+  const merged = mergeExtractions(
+    returnExpressions.map((expression) =>
+      extractClassesFromExpression(expression, registry),
+    ),
+  );
+
+  return { ...merged, isDynamic: true };
 }
 
 function extractFromArrayExpression(

@@ -1,0 +1,32 @@
+{
+  "include": [
+    "**/*.tsx",
+    "**/*.jsx"
+  ],
+  "exclude": [
+    "**/*.test.tsx",
+    "**/*.stories.tsx"
+  ],
+  "names": {
+    "flex items-center justify-between p-4": "page-header"
+  },
+  "analyze": {
+    "minOccurrences": 5,
+    "top": 10,
+    "dedupeSubsets": true
+  },
+  "generate": {
+    "minOccurrences": 3,
+    "prefix": "twu-",
+    "output": "test-project/styles.css",
+    "top": 20,
+    "extractableOnly": true
+  },
+  "apply": {
+    "minOccurrences": 3,
+    "prefix": "twu-",
+    "output": "test-project/styles.css",
+    "prettier": true,
+    "extractableOnly": true
+  }
+}

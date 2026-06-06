@@ -1,5 +1,8 @@
 import chalk from 'chalk';
-import { scanProject } from '../core/scanProject.js';
+import {
+  scanProjectWithSpinner,
+  shouldShowProgress,
+} from '../cli/spinner.js';
 import type { AnalysisReport, AnalyzeOptions } from '../parser/types.js';
 import { printConsoleReport } from '../reporters/consoleReporter.js';
 import { printJsonReport } from '../reporters/jsonReporter.js';
@@ -14,18 +17,24 @@ export async function analyzeCommand(
   let scanResult;
 
   try {
-    scanResult = await scanProject({
-      targetPath,
-      minOccurrences: options.minOccurrences,
-      minSize: options.minSize,
-      maxSize: options.maxSize,
-      topLimit: options.top,
-      dedupeSubsets: options.dedupeSubsets,
-      include: options.include,
-      exclude: options.exclude,
-      changed: options.changed,
-      extractableMinOccurrences: options.extractableMinOccurrences,
-    });
+    scanResult = await scanProjectWithSpinner(
+      {
+        targetPath,
+        minOccurrences: options.minOccurrences,
+        minSize: options.minSize,
+        maxSize: options.maxSize,
+        topLimit: options.top,
+        dedupeSubsets: options.dedupeSubsets,
+        include: options.include,
+        exclude: options.exclude,
+        changed: options.changed,
+        extractableMinOccurrences: options.extractableMinOccurrences,
+      },
+      {
+        showProgress: shouldShowProgress(options),
+        onParseProgress: options.onParseProgress,
+      },
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(chalk.red(`Error: ${message}`));

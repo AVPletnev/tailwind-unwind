@@ -25,6 +25,12 @@ async function pathExists(targetPath: string): Promise<boolean> {
   }
 }
 
+export interface ParseProgress {
+  current: number;
+  total: number;
+  filePath: string;
+}
+
 export interface ScanProjectOptions extends PatternFinderOptions {
   targetPath: string;
   include?: string[];
@@ -33,6 +39,7 @@ export interface ScanProjectOptions extends PatternFinderOptions {
   extractableMinOccurrences?: number;
   /** Scan only git-changed files; string value is the git ref to diff against */
   changed?: boolean | string;
+  onParseProgress?: (progress: ParseProgress) => void;
 }
 
 export interface ScanProjectResult {
@@ -79,7 +86,14 @@ export async function scanProject(
   const occurrences: ClassNameOccurrence[] = [];
   const warnings: string[] = [];
 
-  for (const file of files) {
+  for (let index = 0; index < files.length; index += 1) {
+    const file = files[index]!;
+    options.onParseProgress?.({
+      current: index + 1,
+      total: files.length,
+      filePath: file,
+    });
+
     const result = await parseFile(file);
     warnings.push(...result.warnings);
 

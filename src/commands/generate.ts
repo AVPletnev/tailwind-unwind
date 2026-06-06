@@ -6,6 +6,11 @@ import {
   buildComponentsFromCombinations,
 } from '../core/buildComponents.js';
 import { loadExtractableCombinations } from '../core/loadAnalyzeReport.js';
+import {
+  runWithSpinner,
+  scanProjectWithSpinner,
+  shouldShowProgress,
+} from '../cli/spinner.js';
 import { scanProject } from '../core/scanProject.js';
 import type { AnalyzeOptions } from '../parser/types.js';
 import {
@@ -34,54 +39,77 @@ export async function generateCommand(
   let scanResult: Awaited<ReturnType<typeof scanProject>> | null = null;
   let components: GenerateResult['components'];
   let css: string;
+  const showProgress = shouldShowProgress(options);
 
   try {
     if (options.fromReport) {
-      const loadedReport = await loadExtractableCombinations(options.fromReport, {
-        extractableOnly: options.extractableOnly ?? true,
-      });
+      const built = await runWithSpinner(
+        showProgress,
+        'Building components from report',
+        async (update) => {
+          update('Loading report');
+          const loadedReport = await loadExtractableCombinations(
+            options.fromReport!,
+            {
+              extractableOnly: options.extractableOnly ?? true,
+            },
+          );
 
-      const built = buildComponentsFromCombinations(loadedReport.combinations, {
-        sourcePath: loadedReport.targetPath || targetPath,
-        prefix: options.prefix,
-        names: options.names,
-      });
+          update('Building components from report');
+          return buildComponentsFromCombinations(loadedReport.combinations, {
+            sourcePath: loadedReport.targetPath || targetPath,
+            prefix: options.prefix,
+            names: options.names,
+          });
+        },
+      );
       components = built.components;
       css = built.css;
     } else {
-      scanResult = await scanProject({
-        targetPath,
-        include: options.include,
-        exclude: options.exclude,
-        changed: options.changed,
-        extractableMinOccurrences: options.minOccurrences ?? 3,
-      });
+      scanResult = await scanProjectWithSpinner(
+        {
+          targetPath,
+          include: options.include,
+          exclude: options.exclude,
+          changed: options.changed,
+          extractableMinOccurrences: options.minOccurrences ?? 3,
+        },
+        { showProgress },
+      );
 
-      if (options.extractableOnly) {
-        const combinations = scanResult.report.stats.topCombinations.filter(
-          (combo) => combo.extractable,
-        );
+      const built = await runWithSpinner(
+        showProgress,
+        'Building components',
+        async (update) => {
+          update('Building components');
 
-        const built = buildComponentsFromCombinations(combinations, {
-          sourcePath: scanResult.resolvedPath,
-          prefix: options.prefix,
-          names: options.names,
-        });
-        components = built.components;
-        css = built.css;
-      } else {
-        const built = buildComponents(scanResult.occurrences, {
-          sourcePath: scanResult.resolvedPath,
-          minOccurrences: options.minOccurrences ?? 3,
-          minSize: options.minSize,
-          maxSize: options.maxSize,
-          topLimit: options.top,
-          prefix: options.prefix,
-          names: options.names,
-        });
-        components = built.components;
-        css = built.css;
-      }
+          if (options.extractableOnly) {
+            const topLimit = options.top ?? scanResult!.extractableCombinations.length;
+            const combinations = scanResult!.extractableCombinations.slice(
+              0,
+              topLimit,
+            );
+
+            return buildComponentsFromCombinations(combinations, {
+              sourcePath: scanResult!.resolvedPath,
+              prefix: options.prefix,
+              names: options.names,
+            });
+          }
+
+          return buildComponents(scanResult!.occurrences, {
+            sourcePath: scanResult!.resolvedPath,
+            minOccurrences: options.minOccurrences ?? 3,
+            minSize: options.minSize,
+            maxSize: options.maxSize,
+            topLimit: options.top,
+            prefix: options.prefix,
+            names: options.names,
+          });
+        },
+      );
+      components = built.components;
+      css = built.css;
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -98,8 +126,11 @@ export async function generateCommand(
   }
 
   const outputPath = path.resolve(options.output);
-  await fs.mkdir(path.dirname(outputPath), { recursive: true });
-  await fs.writeFile(outputPath, css, 'utf-8');
+  await runWithSpinner(showProgress, 'Writing CSS', async (update) => {
+    update('Writing CSS');
+    await fs.mkdir(path.dirname(outputPath), { recursive: true });
+    await fs.writeFile(outputPath, css, 'utf-8');
+  });
 
   const result: GenerateResult = {
     outputPath,

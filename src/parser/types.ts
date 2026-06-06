@@ -73,4 +73,11 @@ export interface AnalyzeOptions {
   extractableOnly?: boolean;
   changed?: boolean | string;
   force?: boolean;
+  /** Disable terminal progress spinner (enabled by default in interactive TTY) */
+  noProgress?: boolean;
+  onParseProgress?: (progress: {
+    current: number;
+    total: number;
+    filePath: string;
+  }) => void;
 }

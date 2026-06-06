@@ -3,6 +3,7 @@ import type { NodePath } from '@babel/traverse';
 import type { JSXAttribute, JSXElement, Node } from '@babel/types';
 import fs from 'node:fs/promises';
 import type { ClassNameExtraction, ParseResult } from './types.js';
+import { extractBranchCommonPrefixFromAttribute } from './branchClasses.js';
 import {
   extractFromJSXAttribute,
   isClassAttribute,
@@ -69,6 +70,15 @@ function collectExtractionsFromAst(
 
         if (extraction.classes.length > 0) {
           extractions.push(extraction);
+        }
+
+        const branchCommon = extractBranchCommonPrefixFromAttribute(attr);
+        if (branchCommon && branchCommon.length > 0) {
+          extractions.push({
+            classes: branchCommon,
+            isDynamic: false,
+            line: extraction.line,
+          });
         }
       }
     },

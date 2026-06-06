@@ -77,7 +77,7 @@ In the analyze report, look for `Extractable: yes` — those patterns can be pas
 npx tailwind-unwind check
 ```
 
-Shows how many patterns are ready to extract and previews what `apply` would change (without writing files).
+All commands show a terminal spinner with progress in interactive mode (e.g. `Scanning source files... 42/180`, `Applying replacements... 10/42`). Disabled in CI, with `--format json`, or `--no-progress`.
 
 For CI — fail when duplicates exceed a threshold:
 
@@ -135,6 +135,8 @@ CLI flags override config values.
 | `className={cn('flex p-4', isActive && 'bg-blue')}` | Yes (static part only) |
 | `` className={`flex p-4 ${x}`} `` | Yes (static part only) |
 | `className={buttonVariants()}` | Yes (cva/tv, no arguments) |
+| `className={({ isActive }) => isActive ? 'flex p-4' : 'flex p-2'}` | Yes (per-branch exact match) |
+| `className={({ isActive }) => isActive ? 'flex p-4 text-accent' : 'flex p-4 text-muted'}` | Yes (shared prefix → component class; branch-specific classes stay) |
 | `className={getClasses()}` | No — skipped |
 
 Parsed: `cn`, `clsx`, `classnames`, `twMerge`, `cva`, `tv`, template literals.  
@@ -157,6 +159,7 @@ Override with `--prefix app-` or the `names` field in config.
 
 | Flag | Commands | Purpose |
 |------|----------|---------|
+| `--no-progress` | all commands | Disable terminal spinner (auto-off in CI / `--format json`) |
 | `--fail-on-extractable <n>` | check | Exit 1 when extractable patterns exceed `n` |
 | `--verbose-skipped` | apply, check | List every skipped replacement (default: grouped summary) |
 | `--dry-run` | apply | Preview without writing files |
